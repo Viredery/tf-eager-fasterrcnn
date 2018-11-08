@@ -12,12 +12,14 @@ class ImageTransform(object):
                  scale=(800, 1333),
                  mean=(0, 0, 0),
                  std=(1, 1, 1),
-                 size_divisor=64):
+                 pad_mode='fixed'):
         self.scale = scale
         self.mean = np.array(mean, dtype=np.float32)
         self.std = np.array(std, dtype=np.float32)
-        self.size_divisor = size_divisor
-        
+        self.pad_mode = pad_mode
+            
+        self.impad_size = max(scale) if pad_mode == 'fixed' else 64
+
     
     def __call__(self, img, flip=False):
         img, scale_factor = imrescale(img, self.scale)
@@ -26,8 +28,10 @@ class ImageTransform(object):
           
         if flip:
             img = img_flip(img)
-        if self.size_divisor is not None:
-            img = impad_to_multiple(img, self.size_divisor)
+        if self.pad_mode == 'fixed':
+            img = impad_to_square(img, self.impad_size)
+        else: # 'non-fixed'
+            img = impad_to_multiple(img, self.impad_size)
         
         return img, img_shape, scale_factor
 
@@ -91,20 +95,13 @@ def impad_to_square(img, pad_size):
     Returns
     ---
         ndarray: The padded image with shape of [pad_size, pad_size, channels].
-        window: Tuple.
     '''
-    h, w = img.shape[:2]
+    shape = (pad_size, pad_size, img.shape[-1])
     
-    top_pad = (pad_size - h) // 2
-    bottom_pad = pad_size - h - top_pad
-    left_pad = (pad_size - w) // 2
-    right_pad = pad_size - w - left_pad
+    pad = np.zeros(shape, dtype=img.dtype)
     
-    padding = [(top_pad, bottom_pad), (left_pad, right_pad), (0, 0)]
-    img = np.pad(img, padding, mode='constant', constant_values=0)
-    window = (top_pad, left_pad, h + top_pad, w + left_pad)
-    
-    return img, window
+    pad[:img.shape[0], :img.shape[1], ...] = img
+    return pad
 
 def impad_to_multiple(img, divisor):
     '''Pad an image to ensure each edge to be multiple to some number.

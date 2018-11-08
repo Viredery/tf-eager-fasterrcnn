@@ -18,7 +18,7 @@ def parse_image_meta(meta):
     
     Args
     ---
-        meta: [batch, 11]
+        meta: [batch_size, 11]
 
     Returns
     ---
@@ -37,37 +37,26 @@ def parse_image_meta(meta):
         'flip': flip
     }
 
-def batch_slice(inputs, graph_fn, batch_size, names=None):
-    '''Splits inputs into slices and feeds each slice to a copy of the given
-    computation graph and then combines the results. It allows you to run a
-    graph on a batch of inputs even if the graph is written to support one
-    instance only.
-    inputs: list of tensors. All must have the same first dimension length
-    graph_fn: A function that returns a TF tensor that's part of a graph.
-    batch_size: number of slices to divide the data into.
-    names: If provided, assigns names to the resulting tensors.
+def calc_batch_padded_shape(meta):
     '''
-    if not isinstance(inputs, list):
-        inputs = [inputs]
+    Args
+    ---
+        meta: [batch_size, 11]
+    
+    Returns
+    ---
+        nd.ndarray. Tuple of (height, width)
+    '''
+    return tf.cast(tf.reduce_max(meta[:, 6:8], axis=0), tf.int32).numpy()
 
-    outputs = []
-    for i in range(batch_size):
-        inputs_slice = [x[i] for x in inputs]
-        output_slice = graph_fn(*inputs_slice)
-        if not isinstance(output_slice, (tuple, list)):
-            output_slice = [output_slice]
-        outputs.append(output_slice)
-    # Change outputs from a list of slices where each is
-    # a list of outputs to a list of outputs and each has
-    # a list of slices
-    outputs = list(zip(*outputs))
-
-    if names is None:
-        names = [None] * len(outputs)
-
-    result = [tf.stack(o, axis=0, name=n)
-              for o, n in zip(outputs, names)]
-    if len(result) == 1:
-        result = result[0]
-
-    return result
+def calc_img_shapes(meta):
+    '''
+    Args
+    ---
+        meta: [batch_size, 11]
+    
+    Returns
+    ---
+        nd.ndarray. [batch_size, (height, width)]
+    '''
+    return tf.cast(meta[:, 3:5], tf.int32).numpy()

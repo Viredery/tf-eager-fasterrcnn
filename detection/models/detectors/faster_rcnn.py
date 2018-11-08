@@ -98,10 +98,11 @@ class FasterRCNN(tf.keras.Model):
         
         rpn_class_logits, rpn_probs, rpn_deltas = outputs
         
-        anchors, _ = self.generator.generate_pyramid_anchors(img_metas)
+        anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
         
         
-        proposals_list = self.rpn_head.get_proposals(rpn_probs, rpn_deltas, anchors, img_metas)
+        proposals_list = self.rpn_head.get_proposals(
+            rpn_probs, rpn_deltas, anchors, valid_flags, img_metas)
         
         rois_list = proposals_list
         
@@ -134,9 +135,10 @@ class FasterRCNN(tf.keras.Model):
         
         rpn_class_logits, rpn_probs, rpn_deltas = outputs
         
-        anchors, _ = self.generator.generate_pyramid_anchors(img_metas)
+        anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
         
-        proposals_list = self.rpn_head.get_proposals(rpn_probs, rpn_deltas, anchors, img_metas)
+        proposals_list = self.rpn_head.get_proposals(
+            rpn_probs, rpn_deltas, anchors, valid_flags, img_metas)
         
         
 

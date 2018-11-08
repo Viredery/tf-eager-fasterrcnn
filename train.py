@@ -16,35 +16,34 @@ session = tf.Session(config=config)
 from detection.datasets import coco, data_generator
 from detection.models.detectors import faster_rcnn
 
-batch_size = 2
-
-# train dataset 
 train_dataset = coco.CocoDataSet('./COCO2017/', 'train',
                                  num_max_gts=1000,
                                  flip_ratio=0.5,
-                                 size_divisor=64,
+                                 pad_mode='fixed',
                                  mean=(123.675, 116.28, 103.53),
                                  std=(58.395, 57.12, 57.375),
                                  scale=(800, 1024))
 
+train_generator = data_generator.DataGenerator(train_dataset)
 
-generator = data_generator.DataGenerator(train_dataset)
 
-train_dataset = tf.data.Dataset.from_generator(generator, 
-                                    (tf.float32, tf.float32, tf.float32, tf.int32))
+batch_size = 2
 
-train_dataset = train_dataset.padded_batch(batch_size, 
-                                           padded_shapes=([None,None,None],[None],[None,None],[None]))
+train_tf_dataset = tf.data.Dataset.from_generator(
+    train_generator, (tf.float32, tf.float32, tf.float32, tf.int32))
+train_tf_dataset = train_tf_dataset.padded_batch(
+    batch_size, padded_shapes=([None, None, None], [None], [None, None], [None]))
 
 # model
-model = faster_rcnn.FasterRCNN(num_classes=81)
+model = faster_rcnn.FasterRCNN(
+    num_classes=len(train_dataset.get_categories()))
 
 
 
 # train
 optimizer = tf.train.AdamOptimizer(1e-4)
 
-iterator = train_dataset.make_one_shot_iterator()
+iterator = train_tf_dataset.make_one_shot_iterator()
 
 loss_history = []
 for (batch, inputs) in enumerate(iterator):

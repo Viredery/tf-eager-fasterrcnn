@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 from detection.core.bbox import geometry, transforms
-from detection.utils.misc import parse_image_meta, trim_zeros
+from detection.utils.misc import *
 
 class ProposalTarget(object):
     def __init__(self, target_means, target_stds, num_rcnn_deltas=512):
@@ -44,30 +44,29 @@ class ProposalTarget(object):
            images in one batch may have different num_rois and num_positive_rois.
         '''
         
-        pad_shapes = parse_image_meta(img_metas)['pad_shape']
-        pad_shape = tf.cast(tf.reduce_max(pad_shapes, axis=0), tf.int32)
+        img_shapes = calc_img_shapes(img_metas)
         
         rois_list = []
         rcnn_target_matchs_list = []
         rcnn_target_deltas_list = []
         
         for i in range(img_metas.shape[0]):
-            rois, target_matchs, target_deltas = self.build_single_target(
-                proposals_list[i], gt_boxes[i], gt_class_ids[i], pad_shape)
+            rois, target_matchs, target_deltas = self._build_single_target(
+                proposals_list[i], gt_boxes[i], gt_class_ids[i], img_shapes[i])
             rois_list.append(rois)
             rcnn_target_matchs_list.append(target_matchs)
             rcnn_target_deltas_list.append(target_deltas)
         
         return rois_list, rcnn_target_matchs_list, rcnn_target_deltas_list
     
-    def build_single_target(self, proposals, gt_boxes, gt_class_ids, img_shape):
+    def _build_single_target(self, proposals, gt_boxes, gt_class_ids, img_shape):
         '''
         Args
         ---
             proposals: [num_proposals, (y1, x1, y2, x2)] in normalized coordinates.
             gt_boxes: [num_gt_boxes, (y1, x1, y2, x2)]
             gt_class_ids: [num_gt_boxes]
-            img_shape: Tuple. (img_height, img_width, channels)
+            img_shape: np.ndarray. [2]. (img_height, img_width)
             
         Returns
         ---
@@ -75,7 +74,7 @@ class ProposalTarget(object):
             target_matchs: [num_positive_rois]
             target_deltas: [num_positive_rois, (dy, dx, log(dh), log(dw))]
         '''
-        H, W = img_shape.numpy()[:2]
+        H, W = img_shape
         
         
         gt_boxes, non_zeros = trim_zeros(gt_boxes)

@@ -9,7 +9,7 @@ class CocoDataSet(object):
     def __init__(self, dataset_dir, subset,
                  num_max_gts=1000,
                  flip_ratio=0,
-                 size_divisor=64,
+                 pad_mode='fixed',
                  mean=(0, 0, 0),
                  std=(1, 1, 1),
                  scale=(1024, 800)):
@@ -21,10 +21,15 @@ class CocoDataSet(object):
             subset: What to load (train, val).
             num_max_gts: Int. Maximum number of ground truth instances to use in one image.
             flip_ratio: Float. The ratio of flipping an image and its bounding boxes.
+            pad_mode: Which padded method to use (fixed, non-fixed)
             mean: Tuple. Image mean.
             std: Tuple. Image standard deviation.
             scale: Tuple of two integers.
         '''
+        
+        if subset not in ['train', 'val']:
+            raise AssertionError('subset must be "train" or "val".')
+            
 
         self.coco = COCO("{}/annotations/instances_{}2017.json".format(dataset_dir, subset))
 
@@ -42,7 +47,14 @@ class CocoDataSet(object):
         self.flip_ratio = flip_ratio
         self.num_max_gts = num_max_gts
         
-        self.img_transform = transforms.ImageTransform(scale, mean, std, size_divisor)
+        if pad_mode in ['fixed', 'non-fixed']:
+            self.pad_mode = pad_mode
+        elif subset == 'train':
+            self.pad_mode = 'fixed'
+        else:
+            self.pad_mode = 'non-fixed'
+        
+        self.img_transform = transforms.ImageTransform(scale, mean, std, pad_mode)
         self.bbox_transform = transforms.BboxTransform(num_max_gts)
         
         

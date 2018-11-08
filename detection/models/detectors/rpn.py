@@ -8,10 +8,8 @@ from detection.core.anchor import anchor_generator, anchor_target
 from detection.core.loss import losses
 
 class RPN(tf.keras.Model):
-    def __init__(self, mode, **kwags):
+    def __init__(self, **kwags):
         super(RPN, self).__init__(**kwags)
-        
-        self.mode = mode
         
         # Anchor attributes
         self.ANCHOR_SCALES = (32, 64, 128, 256, 512)
@@ -41,12 +39,8 @@ class RPN(tf.keras.Model):
     
     
     def __call__(self, inputs, training=True):
-        
-        if self.mode == 'training':
-            imgs, img_metas, gt_boxes, gt_class_ids = inputs
-        if self.mode == 'inference':
-            imgs, img_metas = inputs
-            
+
+        imgs, img_metas, gt_boxes, gt_class_ids = inputs
             
         C2, C3, C4, C5 = self.backbone(imgs, training=training)
         P2, P3, P4, P5, P6 = self.neck([C2, C3, C4, C5])
@@ -63,7 +57,7 @@ class RPN(tf.keras.Model):
                    for o, n in zip(outputs, output_names)]
         
         rpn_class_logits, rpn_probs, rpn_deltas = outputs
-                
+
         return [rpn_class_logits, rpn_probs, rpn_deltas]
     
     def loss(self, img_metas, gt_boxes, gt_class_ids,

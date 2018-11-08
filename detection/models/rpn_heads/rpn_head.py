@@ -2,7 +2,7 @@ import tensorflow as tf
 layers = tf.keras.layers
 
 from detection.core.bbox import transforms
-from detection.utils.misc import parse_image_meta
+from detection.utils.misc import *
 
 class RPNHead(tf.keras.Model):
     def __init__(self, 
@@ -16,7 +16,7 @@ class RPNHead(tf.keras.Model):
                                       / - rpn_cls (1x1 conv)
         input - rpn_conv (3x3 conv) -
                                       \ - rpn_reg (1x1 conv)
-           
+
         Attributes
         ---
             anchors_per_location: int. the number of anchors per pixel 
@@ -75,15 +75,16 @@ class RPNHead(tf.keras.Model):
         
         return [rpn_class_logits, rpn_probs, rpn_deltas]
     
-    def get_proposals(self, rpn_probs, rpn_deltas, anchors, img_metas):
+    def get_proposals(self, rpn_probs, rpn_deltas, anchors, valid_flags, img_metas):
         '''Calculate proposals.
         
         Args
         ---
             rpn_probs: [batch_size, num_anchors, (bg prob, fg prob)]
             rpn_deltas: [batch_size, num_anchors, (dy, dx, log(dh), log(dw))]
-            anchors: [num_anchors, (y1, x1, y2, x2)] anchors defined in image 
+            anchors: [num_anchors, (y1, x1, y2, x2)] anchors defined in pixel 
                 coordinates.
+            valid_flags: [batch_size, num_anchors]
             img_metas: [batch_size, 11]
         
         Returns
@@ -97,19 +98,18 @@ class RPNHead(tf.keras.Model):
         
         rpn_probs = rpn_probs[:, :, 1]
         
-        pad_shapes = parse_image_meta(img_metas)['pad_shape']
-        pad_shape = tf.cast(tf.reduce_max(pad_shapes, axis=0), tf.int32)
+        img_shapes = calc_img_shapes(img_metas)
         
         proposals_list = [
             self._get_proposals_single(
-                rpn_probs[i], rpn_deltas[i], anchors, pad_shape)
+                rpn_probs[i], rpn_deltas[i], anchors, valid_flags[i], img_shapes[i])
             for i in range(img_metas.shape[0])
         ]
         
         return proposals_list  
         
     
-    def _get_proposals_single(self, rpn_probs, rpn_deltas, anchors, img_shape):
+    def _get_proposals_single(self, rpn_probs, rpn_deltas, anchors, valid_flags, img_shape):
         '''Calculate proposals.
         
         Args
@@ -117,8 +117,9 @@ class RPNHead(tf.keras.Model):
             rpn_probs: [num_anchors]
             rpn_deltas: [num_anchors, (dy, dx, log(dh), log(dw))]
             anchors: [num_anchors, (y1, x1, y2, x2)] anchors defined in 
-                image coordinates.
-            img_shape: Tuple of (img_height, img_width, channels)
+                pixel coordinates.
+            valid_flags: [num_anchors]
+            img_shape: np.ndarray. [2]. (img_height, img_width)
         
         Returns
         ---
@@ -126,8 +127,15 @@ class RPNHead(tf.keras.Model):
                 coordinates.
         '''
         
-        H, W = img_shape.numpy()[:2]
+        H, W = img_shape
         
+        # filter invalid anchors
+        valid_flags = tf.cast(valid_flags, tf.bool)
+        
+        rpn_probs = tf.boolean_mask(rpn_probs, valid_flags)
+        rpn_deltas = tf.boolean_mask(rpn_deltas, valid_flags)
+        anchors = tf.boolean_mask(anchors, valid_flags)
+
         # Improve performance
         pre_nms_limit = min(6000, anchors.shape[0])
         ix = tf.nn.top_k(rpn_probs, pre_nms_limit, sorted=True).indices

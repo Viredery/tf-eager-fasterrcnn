@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from detection.utils.misc import parse_image_meta
+from detection.utils.misc import *
 
 class PyramidROIAlign(tf.keras.layers.Layer):
     def __init__(self, pool_shape, **kwargs):
@@ -31,15 +31,19 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         '''
         rois_list, feature_map_list, img_metas = inputs
 
-        pad_shapes = parse_image_meta(img_metas)['pad_shape']
-        pad_shape = tf.cast(tf.reduce_max(pad_shapes, axis=0), tf.int32).numpy()
+        img_shapes = calc_img_shapes(img_metas)
         
-        img_area = pad_shape[0] * pad_shape[1]
+        img_areas = img_shapes[:, 0] * img_shapes[:, 1]
         
         num_rois_list = [rois.shape.as_list()[0] for rois in rois_list]
         roi_indices = tf.constant(
             [i for i in range(len(rois_list)) for _ in range(rois_list[i].shape.as_list()[0])],
             dtype=tf.int32
+        )
+        
+        areas = tf.constant(
+            [img_areas[i] for i in range(img_areas.shape[0]) for _ in range(num_rois_list[i])],
+            dtype=tf.float32
         )
 
 
@@ -53,10 +57,10 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         # Equation 1 in the Feature Pyramid Networks paper. Account for
         # the fact that our coordinates are normalized here.
         # e.g. a 224x224 ROI (in pixels) maps to P4
-        roi_level = tf.log(tf.sqrt(h * w) / tf.cast((224.0 / tf.sqrt(img_area * 1.0)), tf.float32)) / tf.log(2.0)
+
+        roi_level = tf.log(tf.sqrt(tf.squeeze(h * w, 1)) / tf.cast((224.0 / tf.sqrt(areas * 1.0)), tf.float32)) / tf.log(2.0)
         roi_level = tf.minimum(5, tf.maximum(
             2, 4 + tf.cast(tf.round(roi_level), tf.int32)))
-        roi_level = tf.squeeze(roi_level, 1)
 
 
         

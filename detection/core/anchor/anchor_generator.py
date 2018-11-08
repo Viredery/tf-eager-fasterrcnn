@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from detection.utils.misc import parse_image_meta
+from detection.utils.misc import *
 
 class AnchorGenerator(object):
     def __init__(self, scales, ratios, feature_strides):
@@ -29,10 +29,7 @@ class AnchorGenerator(object):
             anchors: [num_anchors, (y1, x1, y2, x2)] in image coordinates.
             valid_flags: [batch_size, num_anchors]
         '''
-        
-        img_metas_dict = parse_image_meta(img_metas)
-        pad_shapes = img_metas_dict['pad_shape']
-        pad_shape = tf.cast(tf.reduce_max(pad_shapes, axis=0), tf.int32)
+        pad_shape = calc_batch_padded_shape(img_metas)
         
         feature_shapes = [(pad_shape[0] // stride, pad_shape[1] // stride)
                           for stride in self.feature_strides]
@@ -42,7 +39,7 @@ class AnchorGenerator(object):
         ]
         anchors = tf.concat(anchors, axis=0)
 
-        img_shapes = img_metas_dict['img_shape']
+        img_shapes = calc_img_shapes(img_metas)
         valid_flags = [
             self._generate_valid_flags(anchors, img_shapes[i])
             for i in range(img_shapes.shape[0])
