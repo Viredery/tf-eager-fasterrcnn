@@ -50,12 +50,9 @@ class FasterRCNN(tf.keras.Model):
                                          target_means=self.RPN_TARGET_MEANS,
                                          target_stds=self.RPN_TARGET_STDS)
         
-        
         self.roi_align = roi_align.PyramidROIAlign(pool_shape=self.POOL_SIZE)
         self.bbox_head = bbox_head.BBoxHead(num_classes=self.NUM_CLASSES,
                                             pool_size=self.POOL_SIZE)
-        
-        
         
         self.generator = anchor_generator.AnchorGenerator(
             scales=self.ANCHOR_SCALES, 
@@ -66,12 +63,10 @@ class FasterRCNN(tf.keras.Model):
             target_means=self.RPN_TARGET_MEANS, 
             target_stds=self.RPN_TARGET_STDS)
         
-        
         self.bbox_target = bbox_target.ProposalTarget(
             target_means=self.RCNN_TARGET_MEANS,
             target_stds=self.RPN_TARGET_STDS, 
             num_rcnn_deltas=self.ROI_BATCH_SIZE)
-        
         
         self.rpn_class_loss = losses.rpn_class_loss
         self.rpn_bbox_loss = losses.rpn_bbox_loss
@@ -79,13 +74,11 @@ class FasterRCNN(tf.keras.Model):
         self.rcnn_class_loss = losses.rcnn_class_loss
         self.rcnn_bbox_loss = losses.rcnn_bbox_loss
 
-        
     def __call__(self, inputs, training=True):      
         if training: # training
             imgs, img_metas, gt_boxes, gt_class_ids = inputs
         else: # inference
             ims, img_metas = inputs
-            
 
         C2, C3, C4, C5 = self.backbone(imgs, 
                                        training=training)
@@ -99,7 +92,6 @@ class FasterRCNN(tf.keras.Model):
         layer_outputs = []
         for p in rpn_feature_maps:
             layer_outputs.append(self.rpn_head(p, training=training))
-        
         
         outputs = list(zip(*layer_outputs))
         outputs = [tf.concat(list(o), axis=1) for o in outputs]
@@ -121,7 +113,6 @@ class FasterRCNN(tf.keras.Model):
         pooled_regions_list = self.roi_align(
             (rois_list, rcnn_feature_maps, img_metas), training=training)
 
-
         rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = \
             self.bbox_head(pooled_regions_list, training=training)
 
@@ -129,12 +120,10 @@ class FasterRCNN(tf.keras.Model):
             rpn_target_matchs, rpn_target_deltas = self.anchor_target.build_targets(
                 anchors, valid_flags, gt_boxes, gt_class_ids)
             
-            
             rpn_class_loss = self.rpn_class_loss(
                 rpn_target_matchs, rpn_class_logits)
             rpn_bbox_loss = self.rpn_bbox_loss(
                 rpn_target_deltas, rpn_target_matchs, rpn_deltas)
-
 
             rcnn_class_loss = self.rcnn_class_loss(
                 rcnn_target_matchs_list, rcnn_class_logits_list)
@@ -149,25 +138,24 @@ class FasterRCNN(tf.keras.Model):
                 rcnn_probs_list, rcnn_deltas_list, rois_list, img_metas)
         
             return self.unmold_detections(detections_list, img_metas)
-            
-            
+
     def unmold_detections(self, detections_list, img_metas):
         return [
             self._unmold_single_detection(detections_list[i], img_metas[i])
             for i in range(img_metas.shape[0])
         ]
-        
+
     def _unmold_single_detection(self, detections, img_meta):
         zero_ix = tf.where(tf.not_equal(detections[:, 4], 0))
         detections = tf.gather_nd(detections)
-        
+
         # Extract boxes, class_ids, scores, and class-specific masks
         boxes = detections[:, :4]
         class_ids = tf.cast(detections[:, 4], tf.int32)
         scores = detections[:, 5]
 
         boxes = transforms.bbox_mapping_back(boxes, img_meta)
-        
+
         return {'rois': boxes.numpy(),
                 'class_ids': class_ids.numpy(),
                 'scores': scores.numpy()}

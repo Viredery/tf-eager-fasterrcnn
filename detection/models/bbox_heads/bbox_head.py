@@ -54,7 +54,6 @@ class BBoxHead(tf.keras.Model):
         num_pooled_rois_list = [pooled_rois.shape[0] for pooled_rois in pooled_rois_list]
         pooled_rois = tf.concat(pooled_rois_list, axis=0)
         
-        
         x = self.rcnn_class_conv1(pooled_rois)
         x = self.rcnn_class_bn1(x, training=training)
         x = tf.nn.relu(x)

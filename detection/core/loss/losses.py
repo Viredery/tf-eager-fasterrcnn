@@ -124,13 +124,12 @@ def rcnn_bbox_loss(target_deltas_list, target_matchs_list, rcnn_deltas_list):
     positive_roi_class_ids = tf.cast(
         tf.gather(target_class_ids, positive_roi_ix), tf.int64)
     indices = tf.stack([positive_roi_ix, positive_roi_class_ids], axis=1)
-
+    
     # Gather the deltas (predicted and true) that contribute to loss
-    target_deltas = tf.gather(target_deltas, positive_roi_ix)
     rcnn_deltas = tf.gather_nd(rcnn_deltas, indices)
 
     # Smooth-L1 Loss
-    loss = smooth_l1_loss(y_true=target_deltas, y_pred=rcnn_deltas)
+    loss = smooth_l1_loss(target_deltas, rcnn_deltas)
     loss = tf.reduce_mean(loss) if tf.size(loss) > 0 else tf.constant(0.0)
-    
+
     return loss
