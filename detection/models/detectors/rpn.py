@@ -40,37 +40,40 @@ class RPN(tf.keras.Model):
     
     def __call__(self, inputs, training=True):
 
-        imgs, img_metas, gt_boxes, gt_class_ids = inputs
+        if training: # training
+            imgs, img_metas, gt_boxes, gt_class_ids = inputs
+        else: # inference
+            imgs, img_metas = inputs
             
         C2, C3, C4, C5 = self.backbone(imgs, training=training)
-        P2, P3, P4, P5, P6 = self.neck([C2, C3, C4, C5])
+        P2, P3, P4, P5, P6 = self.neck([C2, C3, C4, C5], training=training)
         
         rpn_feature_maps = [P2, P3, P4, P5, P6]
         
         layer_outputs = []
         for p in rpn_feature_maps:
-            layer_outputs.append(self.rpn_head(p))
+            layer_outputs.append(self.rpn_head(p, training=training))
         
-        output_names = ['rpn_class_logits', 'rpn_class', 'rpn_bbox']
         outputs = list(zip(*layer_outputs))
-        outputs = [tf.concat(list(o), axis=1, name=n)
-                   for o, n in zip(outputs, output_names)]
+        outputs = [tf.concat(list(o), axis=1)
+                   for o in outputs]
         
         rpn_class_logits, rpn_probs, rpn_deltas = outputs
+        
+        if training:
+            anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
 
-        return [rpn_class_logits, rpn_probs, rpn_deltas]
-    
-    def loss(self, img_metas, gt_boxes, gt_class_ids,
-             rpn_class_logits, rpn_probs, rpn_deltas):
-        
-        anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
-        
-        rpn_target_matchs, rpn_target_deltas = self.anchor_target.build_targets(
-            anchors, valid_flags, gt_boxes, gt_class_ids)
-        
-        rpn_class_loss = self.rpn_class_loss(rpn_target_matchs, rpn_class_logits)
-        rpn_bbox_loss = self.rpn_bbox_loss(rpn_target_deltas, rpn_target_matchs, rpn_deltas)
-        
-        return rpn_class_loss + rpn_bbox_loss
+            rpn_target_matchs, rpn_target_deltas = self.anchor_target.build_targets(
+                anchors, valid_flags, gt_boxes, gt_class_ids)
+
+            rpn_class_loss = self.rpn_class_loss(
+                rpn_target_matchs, rpn_class_logits)
+
+            rpn_bbox_loss = self.rpn_bbox_loss(
+                rpn_target_deltas, rpn_target_matchs, rpn_deltas)
+
+            return [rpn_class_loss, rpn_bbox_loss]
+        else:
+            return [rpn_class_logits, rpn_probs, rpn_deltas]
         
         

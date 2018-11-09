@@ -49,7 +49,7 @@ class RPNHead(tf.keras.Model):
                                            kernel_initializer='he_normal', 
                                             name='rpn_bbox_pred')
         
-    def __call__(self, inputs):
+    def __call__(self, inputs, training=True):
         '''
         Args
         ---

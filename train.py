@@ -44,25 +44,19 @@ model = faster_rcnn.FasterRCNN(
 optimizer = tf.train.AdamOptimizer(1e-4)
 
 iterator = train_tf_dataset.make_one_shot_iterator()
-
 loss_history = []
 for (batch, inputs) in enumerate(iterator):
     
     imgs, img_metas, bboxes, labels = inputs
     with tf.GradientTape() as tape:
-        outputs = model((imgs, img_metas, bboxes, labels), training=True)
-        rpn_class_logits, rpn_probs, rpn_deltas, \
-            rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list, \
-            rcnn_target_matchs_list, rcnn_target_deltas_list = outputs
+        rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss = \
+            model((imgs, img_metas, bboxes, labels), training=True)
         
+        loss_value = rpn_class_loss + rpn_bbox_loss + rcnn_class_loss + rcnn_bbox_loss
 
-        
-        loss_value = model.loss(img_metas, bboxes, labels, rpn_class_logits, rpn_probs, rpn_deltas,
-                                rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list,
-                                rcnn_target_matchs_list, rcnn_target_deltas_list)
-
-    print(batch, '-', imgs.shape, loss_value.numpy())
-    loss_history.append(loss_value.numpy())
     grads = tape.gradient(loss_value, model.variables)
     optimizer.apply_gradients(zip(grads, model.variables),
                               global_step=tf.train.get_or_create_global_step())
+
+    print(batch, '-', imgs.shape, loss_value.numpy())
+    loss_history.append(loss_value.numpy())

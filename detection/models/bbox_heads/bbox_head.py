@@ -2,7 +2,7 @@ import tensorflow as tf
 layers = tf.keras.layers
 
 from detection.core.bbox import transforms
-from deteciton.utils.misc import *
+from detection.utils.misc import *
 
 class BBoxHead(tf.keras.Model):
     def __init__(self, num_classes, 

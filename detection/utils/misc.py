@@ -18,17 +18,17 @@ def parse_image_meta(meta):
     
     Args
     ---
-        meta: [batch_size, 11]
+        meta: [..., 11]
 
     Returns
     ---
         a dict of the parsed tensors.
     '''
-    ori_shape = meta[:, 0:3]
-    img_shape = meta[:, 3:6]
-    pad_shape = meta[:, 6:9]
-    scale = meta[:, 9]  
-    flip = meta[:, 10]
+    ori_shape = meta[..., 0:3]
+    img_shape = meta[..., 3:6]
+    pad_shape = meta[..., 6:9]
+    scale = meta[..., 9]  
+    flip = meta[..., 10]
     return {
         'ori_shape': ori_shape,
         'img_shape': img_shape,

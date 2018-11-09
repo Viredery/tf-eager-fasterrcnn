@@ -14,7 +14,7 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         super(PyramidROIAlign, self).__init__(**kwargs)
         self.pool_shape = tuple(pool_shape)
 
-    def __call__(self, inputs):
+    def __call__(self, inputs, training=True):
         '''
         Args
         ---

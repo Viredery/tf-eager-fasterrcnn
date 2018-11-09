@@ -11,7 +11,7 @@ from detection.models.roi_extractors import roi_align
 from detection.core.anchor import anchor_generator, anchor_target
 from detection.core.loss import losses
 
-from detection.core.bbox import bbox_target
+from detection.core.bbox import bbox_target, transforms
 
 class FasterRCNN(tf.keras.Model):
     def __init__(self, num_classes, **kwags):
@@ -78,60 +78,31 @@ class FasterRCNN(tf.keras.Model):
         
         self.rcnn_class_loss = losses.rcnn_class_loss
         self.rcnn_bbox_loss = losses.rcnn_bbox_loss
-    
-    def detect(self, inputs):
-        imgs, img_metas = inputs
+
         
-        C2, C3, C4, C5 = self.backbone(imgs)
-        P2, P3, P4, P5, P6 = self.neck([C2, C3, C4, C5])
+    def __call__(self, inputs, training=True):      
+        if training: # training
+            imgs, img_metas, gt_boxes, gt_class_ids = inputs
+        else: # inference
+            ims, img_metas = inputs
+            
+
+        C2, C3, C4, C5 = self.backbone(imgs, 
+                                       training=training)
+        
+        P2, P3, P4, P5, P6 = self.neck([C2, C3, C4, C5], 
+                                       training=training)
         
         rpn_feature_maps = [P2, P3, P4, P5, P6]
         rcnn_feature_maps = [P2, P3, P4, P5]
         
         layer_outputs = []
         for p in rpn_feature_maps:
-            layer_outputs.append(self.rpn_head(p))
-        output_names = ['rpn_class_logits', 'rpn_probs', 'rpn_deltas']
+            layer_outputs.append(self.rpn_head(p, training=training))
+        
+        
         outputs = list(zip(*layer_outputs))
-        outputs = [tf.concat(list(o), axis=1, name=n)
-                   for o, n in zip(outputs, output_names)]
-        
-        rpn_class_logits, rpn_probs, rpn_deltas = outputs
-        
-        anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
-        
-        
-        proposals_list = self.rpn_head.get_proposals(
-            rpn_probs, rpn_deltas, anchors, valid_flags, img_metas)
-        
-        rois_list = proposals_list
-        
-        pooled_regions_list = self.roi_align((rois_list, rcnn_feature_maps, img_metas))
-        
-        rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = \
-            self.bbox_head(pooled_regions_list)
-        
-        
-        
-    def __call__(self, inputs, training=True):
-        
-        imgs, img_metas, gt_boxes, gt_class_ids = inputs
-
-
-        C2, C3, C4, C5 = self.backbone(imgs, training=training)
-        P2, P3, P4, P5, P6 = self.neck([C2, C3, C4, C5])
-        
-        rpn_feature_maps = [P2, P3, P4, P5, P6]
-        rcnn_feature_maps = [P2, P3, P4, P5]
-        
-        layer_outputs = []
-        for p in rpn_feature_maps:
-            layer_outputs.append(self.rpn_head(p))
-        
-        output_names = ['rpn_class_logits', 'rpn_probs', 'rpn_deltas']
-        outputs = list(zip(*layer_outputs))
-        outputs = [tf.concat(list(o), axis=1, name=n)
-                   for o, n in zip(outputs, output_names)]
+        outputs = [tf.concat(list(o), axis=1) for o in outputs]
         
         rpn_class_logits, rpn_probs, rpn_deltas = outputs
         
@@ -140,46 +111,63 @@ class FasterRCNN(tf.keras.Model):
         proposals_list = self.rpn_head.get_proposals(
             rpn_probs, rpn_deltas, anchors, valid_flags, img_metas)
         
-        
-
-        rois_list, rcnn_target_matchs_list, rcnn_target_deltas_list = \
-            self.bbox_target.build_targets(
-                proposals_list, gt_boxes, gt_class_ids, img_metas)
-
-        pooled_regions_list = self.roi_align((rois_list, rcnn_feature_maps, img_metas))
+        if training:
+            rois_list, rcnn_target_matchs_list, rcnn_target_deltas_list = \
+                self.bbox_target.build_targets(
+                    proposals_list, gt_boxes, gt_class_ids, img_metas)
+        else:
+            rois_list = proposals_list
+            
+        pooled_regions_list = self.roi_align(
+            (rois_list, rcnn_feature_maps, img_metas), training=training)
 
 
         rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = \
-            self.bbox_head(pooled_regions_list)
+            self.bbox_head(pooled_regions_list, training=training)
+
+        if training:
+            rpn_target_matchs, rpn_target_deltas = self.anchor_target.build_targets(
+                anchors, valid_flags, gt_boxes, gt_class_ids)
+            
+            
+            rpn_class_loss = self.rpn_class_loss(
+                rpn_target_matchs, rpn_class_logits)
+            rpn_bbox_loss = self.rpn_bbox_loss(
+                rpn_target_deltas, rpn_target_matchs, rpn_deltas)
 
 
-        return [rpn_class_logits, rpn_probs, rpn_deltas,
-                rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list,
-                rcnn_target_matchs_list, rcnn_target_deltas_list]
+            rcnn_class_loss = self.rcnn_class_loss(
+                rcnn_target_matchs_list, rcnn_class_logits_list)
+            rcnn_bbox_loss = self.rcnn_bbox_loss(
+                rcnn_target_deltas_list, rcnn_target_matchs_list, rcnn_deltas_list)            
+            
+            
+            return [rpn_class_loss, rpn_bbox_loss, 
+                    rcnn_class_loss, rcnn_bbox_loss]
+        else:
+            detections_list = self.bbox_head.get_bboxes(
+                rcnn_probs_list, rcnn_deltas_list, rois_list, img_metas)
         
+            return self.unmold_detections(detections_list, img_metas)
+            
+            
+    def unmold_detections(self, detections_list, img_metas):
+        return [
+            self._unmold_single_detection(detections_list[i], img_metas[i])
+            for i in range(img_metas.shape[0])
+        ]
+        
+    def _unmold_single_detection(self, detections, img_meta):
+        zero_ix = tf.where(tf.not_equal(detections[:, 4], 0))
+        detections = tf.gather_nd(detections)
+        
+        # Extract boxes, class_ids, scores, and class-specific masks
+        boxes = detections[:, :4]
+        class_ids = tf.cast(detections[:, 4], tf.int32)
+        scores = detections[:, 5]
 
-    
-    def loss(self, img_metas, gt_boxes, gt_class_ids,
-             rpn_class_logits, rpn_probs, rpn_deltas,
-             rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list,
-             rcnn_target_matchs_list, rcnn_target_deltas_list):
+        boxes = transforms.bbox_mapping_back(boxes, img_meta)
         
-        anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
-        
-        rpn_target_matchs, rpn_target_deltas = self.anchor_target.build_targets(
-            anchors, valid_flags, gt_boxes, gt_class_ids)
-        
-        
-        rpn_class_loss = self.rpn_class_loss(
-            rpn_target_matchs, rpn_class_logits)
-        rpn_bbox_loss = self.rpn_bbox_loss(
-            rpn_target_deltas, rpn_target_matchs, rpn_deltas)
-        
-        
-        rcnn_class_loss = self.rcnn_class_loss(
-            rcnn_target_matchs_list, rcnn_class_logits_list)
-        rcnn_bbox_loss = self.rcnn_bbox_loss(
-            rcnn_target_deltas_list, rcnn_target_matchs_list, rcnn_deltas_list)
-        
-        return rpn_class_loss + rpn_bbox_loss + rcnn_class_loss + rcnn_bbox_loss
-        
+        return {'rois': boxes.numpy(),
+                'class_ids': class_ids.numpy(),
+                'scores': scores.numpy()}

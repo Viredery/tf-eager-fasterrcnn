@@ -1,5 +1,7 @@
 import tensorflow as tf
 
+from detection.utils.misc import *
+
 def bbox2delta(box, gt_box, target_means, target_stds):
     '''Compute refinement needed to transform box to gt_box.
     
@@ -83,3 +85,34 @@ def bbox_clip(box, window):
     clipped = tf.concat([y1, x1, y2, x2], axis=1)
     clipped.set_shape((clipped.shape[0], 4))
     return clipped
+
+def bbox_flip(bboxes, width):
+    '''Flip bboxes horizontally.
+    
+    Args
+    ---
+        bboxes: [..., 4]
+        width: Int or Float
+    '''
+    
+    flipped = tf.Variable(bboxes.initialized_value())
+    flipped[..., 1] = width - bboxes[..., 3] - 1
+    flipped[..., 3] = width - bboxes[..., 1] - 1
+    return flipped
+
+
+def bbox_mapping_back(box, img_meta):
+    '''
+    Args
+    ---
+        box: [N, 4]
+        img_meta: [11]
+    '''
+    img_meta = parse_image_meta(img_meta)
+    scale = img_meta['scale']
+    flip = img_meta['flip']
+    if tf.equal(flip, 1):
+        box = bbox_flip(box, img_meta['img_shape'][1])
+    box = box / scale
+    
+    return box
