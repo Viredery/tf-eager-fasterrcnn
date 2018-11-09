@@ -83,7 +83,7 @@ def rpn_bbox_loss(target_deltas, target_matchs, rpn_deltas):
 
 
 def rcnn_class_loss(target_matchs_list, rcnn_class_logits_list):
-    '''Loss for the classifier head of Mask RCNN.
+    '''Loss for the classifier head of Faster RCNN.
     
     Args
     ---
@@ -105,7 +105,7 @@ def rcnn_class_loss(target_matchs_list, rcnn_class_logits_list):
 
 
 def rcnn_bbox_loss(target_deltas_list, target_matchs_list, rcnn_deltas_list):
-    '''Loss for Mask R-CNN bounding box refinement.
+    '''Loss for Faster R-CNN bounding box refinement.
     
     Args
     ---

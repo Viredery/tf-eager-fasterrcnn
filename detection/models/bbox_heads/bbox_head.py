@@ -2,6 +2,7 @@ import tensorflow as tf
 layers = tf.keras.layers
 
 from detection.core.bbox import transforms
+from deteciton.utils.misc import *
 
 class BBoxHead(tf.keras.Model):
     def __init__(self, num_classes, 
@@ -78,25 +79,26 @@ class BBoxHead(tf.keras.Model):
             
         return rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list
 
-    def get_bboxes(self, rcnn_probs_list, rcnn_deltas_list, rois_list, img_meta_list):
+    def get_bboxes(self, rcnn_probs_list, rcnn_deltas_list, rois_list, img_metas):
         '''
         Args
         ---
             rcnn_probs_list: List of [num_rois, num_classes]
             rcnn_deltas_list: List of [num_rois, num_classes, (dy, dx, log(dh), log(dw))]
             rois_list: List of [num_rois, (y1, x1, y2, x2)]
-            img_meta_list: List of dict
+            img_meta_list: [batch_size, 11]
         
         Returns
         ---
             detections_list: List of [num_detections, (y1, x1, y2, x2, class_id, score)]
-                coordinates are in image coordinates.
+                coordinates are in pixel coordinates.
         '''
         
+        img_shapes = calc_img_shapes(img_metas)
         detections_list = [
             self._get_bboxes_single(
-                rcnn_probs_list[i], rcnn_deltas_list[i], rois_list[i], img_meta_list[i]['img_shape'])
-            for i in range(len(img_meta_list))
+                rcnn_probs_list[i], rcnn_deltas_list[i], rois_list[i], img_shapes[i])
+            for i in range(img_metas.shape[0])
         ]
         return detections_list  
     
@@ -107,22 +109,24 @@ class BBoxHead(tf.keras.Model):
             rcnn_probs: [num_rois, num_classes]
             rcnn_deltas: [num_rois, num_classes, (dy, dx, log(dh), log(dw))]
             rois: [num_rois, (y1, x1, y2, x2)]
-            img_shape: (img_height, img_width)       
+            img_shape: np.ndarray. [2]. (img_height, img_width)       
         '''
         H, W = img_shape
+        
         # Class IDs per ROI
         class_ids = tf.argmax(rcnn_probs, axis=1, output_type=tf.int32)
         # Class probability of the top class of each ROI
         indices = tf.stack([tf.range(rcnn_probs.shape[0]), class_ids], axis=1)
         class_scores = tf.gather_nd(rcnn_probs, indices)
         # Class-specific bounding box deltas
-        deltas_specific = tf.gather_nd(deltas, indices)
+        deltas_specific = tf.gather_nd(rcnn_deltas, indices)
         # Apply bounding box deltas
         # Shape: [num_rois, (y1, x1, y2, x2)] in normalized coordinates        
         refined_rois = transforms.delta2bbox(rois, deltas_specific, self.target_means, self.target_stds)
         
         # Clip boxes to image window
-        window = tf.constant([0., 0., H/H, W/W], dtype=tf.float32)
+        refined_rois *= tf.constant([H, W, H, W], dtype=tf.float32)
+        window = tf.constant([0., 0., H * 1., W * 1.], dtype=tf.float32)
         refined_rois = transforms.bbox_clip(refined_rois, window)
         
         # Filter out background boxes
@@ -170,7 +174,7 @@ class BBoxHead(tf.keras.Model):
         keep = tf.gather(keep, top_ids)  
         
         detections = tf.concat([
-            tf.gather(refined_rois, keep) * tf.constant([H, W, H, W], dtype=tf.float32),
+            tf.gather(refined_rois, keep),
             tf.to_float(tf.gather(class_ids, keep))[..., tf.newaxis],
             tf.gather(class_scores, keep)[..., tf.newaxis]
             ], axis=1)

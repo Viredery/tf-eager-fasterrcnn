@@ -9,13 +9,13 @@ import tensorflow as tf
 layers = tf.keras.layers
 
 class _Bottleneck(tf.keras.Model):
-    def __init__(self, filters, stage, block, 
+    def __init__(self, filters, block, 
                  downsampling=False, stride=1, **kwargs):
         super(_Bottleneck, self).__init__(**kwargs)
 
         filters1, filters2, filters3 = filters
-        conv_name_base = 'res' + str(stage) + block + '_branch'
-        bn_name_base   = 'bn'  + str(stage) + block + '_branch'
+        conv_name_base = 'res' + block + '_branch'
+        bn_name_base   = 'bn'  + block + '_branch'
 
         self.downsampling = downsampling
         self.stride = stride
@@ -86,29 +86,29 @@ class ResNet50(tf.keras.Model):
         self.bn_conv1 = layers.BatchNormalization(name='bn_conv1')
         self.max_pool = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same')
         
-        self.res2a = _Bottleneck([64, 64, 256], stage=2, block='a', 
+        self.res2a = _Bottleneck([64, 64, 256], block='2a',
                                  downsampling=True, stride=1)
-        self.res2b = _Bottleneck([64, 64, 256], stage=2, block='b')
-        self.res2c = _Bottleneck([64, 64, 256], stage=2, block='c')
+        self.res2b = _Bottleneck([64, 64, 256], block='2b')
+        self.res2c = _Bottleneck([64, 64, 256], block='2c')
         
-        self.res3a = _Bottleneck([128, 128, 512], stage=3, block='a', 
+        self.res3a = _Bottleneck([128, 128, 512], block='3a', 
                                  downsampling=True, stride=2)
-        self.res3b = _Bottleneck([128, 128, 512], stage=3, block='b')
-        self.res3c = _Bottleneck([128, 128, 512], stage=3, block='c')
-        self.res3d = _Bottleneck([128, 128, 512], stage=3, block='d')
+        self.res3b = _Bottleneck([128, 128, 512], block='3b')
+        self.res3c = _Bottleneck([128, 128, 512], block='3c')
+        self.res3d = _Bottleneck([128, 128, 512], block='3d')
         
-        self.res4a = _Bottleneck([256, 256, 1024], stage=4, block='a', 
+        self.res4a = _Bottleneck([256, 256, 1024], block='4a', 
                                  downsampling=True, stride=2)
-        self.res4b = _Bottleneck([256, 256, 1024], stage=4, block='b')
-        self.res4c = _Bottleneck([256, 256, 1024], stage=4, block='c')
-        self.res4d = _Bottleneck([256, 256, 1024], stage=4, block='d')
-        self.res4e = _Bottleneck([256, 256, 1024], stage=4, block='e')
-        self.res4f = _Bottleneck([256, 256, 1024], stage=4, block='f')
+        self.res4b = _Bottleneck([256, 256, 1024], block='4b')
+        self.res4c = _Bottleneck([256, 256, 1024], block='4c')
+        self.res4d = _Bottleneck([256, 256, 1024], block='4d')
+        self.res4e = _Bottleneck([256, 256, 1024], block='4e')
+        self.res4f = _Bottleneck([256, 256, 1024], block='4f')
         
-        self.res5a = _Bottleneck([512, 512, 2048], stage=5, block='a', 
+        self.res5a = _Bottleneck([512, 512, 2048], block='5a', 
                                  downsampling=True, stride=2)
-        self.res5b = _Bottleneck([512, 512, 2048], stage=5, block='b')
-        self.res5c = _Bottleneck([512, 512, 2048], stage=5, block='c')
+        self.res5b = _Bottleneck([512, 512, 2048], block='5b')
+        self.res5c = _Bottleneck([512, 512, 2048], block='5c')
         
         
         self.out_channel = (256, 512, 1024, 2048)
@@ -151,3 +151,14 @@ class ResNet50(tf.keras.Model):
         C5_shape = tf.TensorShape([batch, H // 32, W // 32, self.out_channel[3]])
         
         return (C2_shape, C3_shape, C4_shape, C5_shape)
+
+if __name__ == '__main__':
+    tf.enable_eager_execution()
+    imgs = tf.random_normal((2, 1024, 1024, 3))
+    
+    model = ResNet50()
+    C2, C3, C4, C5 = model(imgs)
+    print('C2 shape:', C2.shape.as_list())
+    print('C3 shape:', C3.shape.as_list())
+    print('C4 shape:', C4.shape.as_list())
+    print('C5 shape:', C5.shape.as_list())

@@ -83,3 +83,21 @@ class FPN(tf.keras.Model):
                 tf.TensorShape(C4_shape),
                 tf.TensorShape(C5_shape),
                 tf.TensorShape(C6_shape)]
+
+if __name__ == '__main__':
+    tf.enable_eager_execution()
+    
+    C2 = tf.random_normal((2, 256, 256,  256))
+    C3 = tf.random_normal((2, 128, 128,  512))
+    C4 = tf.random_normal((2,  64,  64, 1024))
+    C5 = tf.random_normal((2,  32,  32, 2048))
+    
+    fpn = FPN()
+    
+    P2, P3, P4, P5, P6 = fpn([C2, C3, C4, C5])
+    
+    print('P2 shape:', P2.shape.as_list())
+    print('P3 shape:', P3.shape.as_list())
+    print('P4 shape:', P4.shape.as_list())
+    print('P5 shape:', P5.shape.as_list())
+    print('P6 shape:', P6.shape.as_list())
