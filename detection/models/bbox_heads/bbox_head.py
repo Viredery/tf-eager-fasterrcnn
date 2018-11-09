@@ -110,10 +110,10 @@ class BBoxHead(tf.keras.Model):
             rois: [num_rois, (y1, x1, y2, x2)]
             img_shape: np.ndarray. [2]. (img_height, img_width)       
         '''
-        H, W = img_shape
-        
+        H, W = img_shape   
         # Class IDs per ROI
         class_ids = tf.argmax(rcnn_probs, axis=1, output_type=tf.int32)
+        
         # Class probability of the top class of each ROI
         indices = tf.stack([tf.range(rcnn_probs.shape[0]), class_ids], axis=1)
         class_scores = tf.gather_nd(rcnn_probs, indices)
@@ -128,8 +128,10 @@ class BBoxHead(tf.keras.Model):
         window = tf.constant([0., 0., H * 1., W * 1.], dtype=tf.float32)
         refined_rois = transforms.bbox_clip(refined_rois, window)
         
+        
         # Filter out background boxes
         keep = tf.where(class_ids > 0)[:, 0]
+        
         # Filter out low confidence boxes
         if self.min_confidence:
             conf_keep = tf.where(class_scores >= self.min_confidence)[:, 0]
@@ -166,7 +168,7 @@ class BBoxHead(tf.keras.Model):
                                         tf.expand_dims(nms_keep, 0))
         keep = tf.sparse_tensor_to_dense(keep)[0]
         # Keep top detections
-        roi_count = config.DETECTION_MAX_INSTANCES
+        roi_count = self.max_instances
         class_scores_keep = tf.gather(class_scores, keep)
         num_keep = tf.minimum(tf.shape(class_scores_keep)[0], roi_count)
         top_ids = tf.nn.top_k(class_scores_keep, k=num_keep, sorted=True)[1]

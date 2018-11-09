@@ -78,7 +78,7 @@ class FasterRCNN(tf.keras.Model):
         if training: # training
             imgs, img_metas, gt_boxes, gt_class_ids = inputs
         else: # inference
-            ims, img_metas = inputs
+            imgs, img_metas = inputs
 
         C2, C3, C4, C5 = self.backbone(imgs, 
                                        training=training)
@@ -147,7 +147,7 @@ class FasterRCNN(tf.keras.Model):
 
     def _unmold_single_detection(self, detections, img_meta):
         zero_ix = tf.where(tf.not_equal(detections[:, 4], 0))
-        detections = tf.gather_nd(detections)
+        detections = tf.gather_nd(detections, zero_ix)
 
         # Extract boxes, class_ids, scores, and class-specific masks
         boxes = detections[:, :4]

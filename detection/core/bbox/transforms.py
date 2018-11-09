@@ -94,10 +94,13 @@ def bbox_flip(bboxes, width):
         bboxes: [..., 4]
         width: Int or Float
     '''
+    y1, x1, y2, x2 = tf.split(bboxes, 4, axis=-1)
     
-    flipped = tf.Variable(bboxes.initialized_value())
-    flipped[..., 1] = width - bboxes[..., 3] - 1
-    flipped[..., 3] = width - bboxes[..., 1] - 1
+    new_x1 = width - x2
+    new_x2 = width - x1
+    
+    flipped = tf.concat([y1, new_x1, y2, new_x2], axis=-1)
+    
     return flipped
 
 
