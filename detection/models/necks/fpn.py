@@ -56,9 +56,9 @@ class FPN(tf.keras.Model):
         
         # Attach 3x3 conv to all P layers to get the final feature maps.
         P2 = self.fpn_p2(P2)
-        P3 = self.fpn_p2(P3)
-        P4 = self.fpn_p2(P4)
-        P5 = self.fpn_p2(P5)
+        P3 = self.fpn_p3(P3)
+        P4 = self.fpn_p4(P4)
+        P5 = self.fpn_p5(P5)
         
         # subsampling from P5 with stride of 2.
         P6 = self.fpn_p6(P5)
