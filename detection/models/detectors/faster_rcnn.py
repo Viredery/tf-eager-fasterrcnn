@@ -42,7 +42,7 @@ class FasterRCNN(tf.keras.Model):
         self.POOL_SIZE = (7, 7)
         
         
-        self.backbone = resnet.ResNet50()
+        self.backbone = resnet.ResNet(depth=101)
         self.neck = fpn.FPN()
         self.rpn_head = rpn_head.RPNHead(anchors_per_location=len(self.ANCHOR_RATIOS),
                                          proposal_count=self.PRN_PROPOSAL_COUNT,

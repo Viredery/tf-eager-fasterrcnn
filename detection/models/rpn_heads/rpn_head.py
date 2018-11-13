@@ -47,7 +47,7 @@ class RPNHead(tf.keras.Model):
 
         self.rpn_delta_pred = layers.Conv2D(anchors_per_location * 4, (1, 1),
                                            kernel_initializer='he_normal', 
-                                            name='rpn_bbox_pred')
+                                           name='rpn_bbox_pred')
         
     def __call__(self, inputs, training=True):
         '''

@@ -22,7 +22,7 @@ class RPN(tf.keras.Model):
         self.RPN_TARGET_MEANS = (0., 0., 0., 0.)
         self.RPN_TARGET_STDS = (0.1, 0.1, 0.2, 0.2)
         
-        self.backbone = resnet.ResNet50()
+        self.backbone = resnet.ResNet(depth=101)
         self.neck = fpn.FPN()
         self.rpn_head = rpn_head.RPNHead(anchors_per_location=len(self.ANCHOR_RATIOS))
         

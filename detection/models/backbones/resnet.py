@@ -74,9 +74,13 @@ class _Bottleneck(tf.keras.Model):
         return tf.TensorShape(shape)        
         
 
-class ResNet50(tf.keras.Model):
-    def __init__(self, **kwargs):
-        super(ResNet50, self).__init__(**kwargs)
+class ResNet(tf.keras.Model):
+    def __init__(self, depth, **kwargs):
+        super(ResNet, self).__init__(**kwargs)
+              
+        if depth not in [50, 101]:
+            raise AssertionError('depth must be 50 or 101.')
+        self.depth = depth
     
         self.conv1 = layers.Conv2D(64, (7, 7),
                                    strides=(2, 2),
@@ -104,6 +108,24 @@ class ResNet50(tf.keras.Model):
         self.res4d = _Bottleneck([256, 256, 1024], block='4d')
         self.res4e = _Bottleneck([256, 256, 1024], block='4e')
         self.res4f = _Bottleneck([256, 256, 1024], block='4f')
+        if self.depth == 101:
+            self.res4g = _Bottleneck([256, 256, 1024], block='4g')
+            self.res4h = _Bottleneck([256, 256, 1024], block='4h')
+            self.res4i = _Bottleneck([256, 256, 1024], block='4i')
+            self.res4j = _Bottleneck([256, 256, 1024], block='4j')
+            self.res4k = _Bottleneck([256, 256, 1024], block='4k')
+            self.res4l = _Bottleneck([256, 256, 1024], block='4l')
+            self.res4m = _Bottleneck([256, 256, 1024], block='4m')
+            self.res4n = _Bottleneck([256, 256, 1024], block='4n')
+            self.res4o = _Bottleneck([256, 256, 1024], block='4o')
+            self.res4p = _Bottleneck([256, 256, 1024], block='4p')
+            self.res4q = _Bottleneck([256, 256, 1024], block='4q')
+            self.res4r = _Bottleneck([256, 256, 1024], block='4r')
+            self.res4s = _Bottleneck([256, 256, 1024], block='4s')
+            self.res4t = _Bottleneck([256, 256, 1024], block='4t')
+            self.res4u = _Bottleneck([256, 256, 1024], block='4u')
+            self.res4v = _Bottleneck([256, 256, 1024], block='4v')
+            self.res4w = _Bottleneck([256, 256, 1024], block='4w') 
         
         self.res5a = _Bottleneck([512, 512, 2048], block='5a', 
                                  downsampling=True, stride=2)
@@ -115,7 +137,7 @@ class ResNet50(tf.keras.Model):
     
     def __call__(self, inputs, training=True):
         x = self.conv1(inputs)
-        x = self.bn_conv1(x)
+        x = self.bn_conv1(x, training=training)
         x = tf.nn.relu(x)
         x = self.max_pool(x)
         
@@ -133,7 +155,26 @@ class ResNet50(tf.keras.Model):
         x = self.res4c(x, training=training)
         x = self.res4d(x, training=training)
         x = self.res4e(x, training=training)
-        C4 = x = self.res4f(x, training=training)
+        x = self.res4f(x, training=training)
+        if self.depth == 101:
+            x = self.res4g(x, training=training)
+            x = self.res4h(x, training=training)
+            x = self.res4i(x, training=training)
+            x = self.res4j(x, training=training)
+            x = self.res4k(x, training=training)
+            x = self.res4l(x, training=training)
+            x = self.res4m(x, training=training)
+            x = self.res4n(x, training=training)
+            x = self.res4o(x, training=training)
+            x = self.res4p(x, training=training)
+            x = self.res4q(x, training=training)
+            x = self.res4r(x, training=training)
+            x = self.res4s(x, training=training)
+            x = self.res4t(x, training=training)
+            x = self.res4u(x, training=training)
+            x = self.res4v(x, training=training)
+            x = self.res4w(x, training=training) 
+        C4 = x
         
         x = self.res5a(x, training=training)
         x = self.res5b(x, training=training)
@@ -151,14 +192,3 @@ class ResNet50(tf.keras.Model):
         C5_shape = tf.TensorShape([batch, H // 32, W // 32, self.out_channel[3]])
         
         return (C2_shape, C3_shape, C4_shape, C5_shape)
-
-if __name__ == '__main__':
-    tf.enable_eager_execution()
-    imgs = tf.random_normal((2, 1024, 1024, 3))
-    
-    model = ResNet50()
-    C2, C3, C4, C5 = model(imgs)
-    print('C2 shape:', C2.shape.as_list())
-    print('C3 shape:', C3.shape.as_list())
-    print('C4 shape:', C4.shape.as_list())
-    print('C5 shape:', C5.shape.as_list())

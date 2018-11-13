@@ -145,7 +145,7 @@ class BBoxHead(tf.keras.Model):
         pre_nms_scores = tf.gather(class_scores, keep)
         pre_nms_rois = tf.gather(refined_rois,   keep)
         unique_pre_nms_class_ids = tf.unique(pre_nms_class_ids)[0]
-        
+
         def nms_keep_map(class_id):
             '''Apply Non-Maximum Suppression on ROIs of the given class.'''
             # Indices of ROIs of the given class
@@ -163,6 +163,7 @@ class BBoxHead(tf.keras.Model):
         # 2. Map over class IDs
         nms_keep = tf.map_fn(nms_keep_map, unique_pre_nms_class_ids,
                              dtype=tf.int64)
+        nms_keep = tf.reshape(nms_keep, [-1])
         # 3. Compute intersection between keep and nms_keep
         keep = tf.sets.set_intersection(tf.expand_dims(keep, 0),
                                         tf.expand_dims(nms_keep, 0))
