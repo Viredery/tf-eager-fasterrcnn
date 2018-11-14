@@ -21,7 +21,7 @@ train_dataset = coco.CocoDataSet('./COCO2017/', 'train',
                                  flip_ratio=0.5,
                                  pad_mode='fixed',
                                  mean=(123.675, 116.28, 103.53),
-                                 std=(58.395, 57.12, 57.375),
+#                                  std=(58.395, 57.12, 57.375),
                                  scale=(800, 1024))
 
 train_generator = data_generator.DataGenerator(train_dataset)

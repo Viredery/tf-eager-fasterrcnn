@@ -25,18 +25,18 @@ class BBoxHead(tf.keras.Model):
         self.target_stds = target_stds
         
         self.rcnn_class_conv1 = layers.Conv2D(1024, self.pool_size, 
-                                              padding='valid', name='mrcnn_class_conv1')
+                                              padding='valid', name='rcnn_class_conv1')
         
-        self.rcnn_class_bn1 = layers.BatchNormalization(name='mrcnn_class_bn1')
+        self.rcnn_class_bn1 = layers.BatchNormalization(name='rcnn_class_bn1')
         
         self.rcnn_class_conv2 = layers.Conv2D(1024, (1, 1), 
-                                              name='mrcnn_class_conv2')
+                                              name='rcnn_class_conv2')
         
-        self.rcnn_class_bn2 = layers.BatchNormalization(name='mrcnn_class_bn2')
+        self.rcnn_class_bn2 = layers.BatchNormalization(name='rcnn_class_bn2')
         
-        self.rcnn_class_logits = layers.Dense(num_classes, name='mrcnn_class_logits')
+        self.rcnn_class_logits = layers.Dense(num_classes, name='rcnn_class_logits')
         
-        self.rcnn_delta_fc = layers.Dense(num_classes * 4, name='mrcnn_bbox_fc')
+        self.rcnn_delta_fc = layers.Dense(num_classes * 4, name='rcnn_bbox_fc')
         
     def __call__(self, inputs, training=True):
         '''
