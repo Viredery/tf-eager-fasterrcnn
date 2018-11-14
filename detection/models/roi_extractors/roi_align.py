@@ -31,9 +31,9 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         '''
         rois_list, feature_map_list, img_metas = inputs
 
-        img_shapes = calc_img_shapes(img_metas)
+        pad_shapes = calc_pad_shapes(img_metas)
         
-        img_areas = img_shapes[:, 0] * img_shapes[:, 1]
+        pad_areas = pad_shapes[:, 0] * pad_shapes[:, 1]
         
         num_rois_list = [rois.shape.as_list()[0] for rois in rois_list]
         roi_indices = tf.constant(
@@ -42,7 +42,7 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         )
         
         areas = tf.constant(
-            [img_areas[i] for i in range(img_areas.shape[0]) for _ in range(num_rois_list[i])],
+            [pad_areas[i] for i in range(pad_areas.shape[0]) for _ in range(num_rois_list[i])],
             dtype=tf.float32
         )
 

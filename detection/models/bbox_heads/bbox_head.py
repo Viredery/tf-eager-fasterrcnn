@@ -93,10 +93,10 @@ class BBoxHead(tf.keras.Model):
                 coordinates are in pixel coordinates.
         '''
         
-        img_shapes = calc_img_shapes(img_metas)
+        pad_shapes = calc_pad_shapes(img_metas)
         detections_list = [
             self._get_bboxes_single(
-                rcnn_probs_list[i], rcnn_deltas_list[i], rois_list[i], img_shapes[i])
+                rcnn_probs_list[i], rcnn_deltas_list[i], rois_list[i], pad_shapes[i])
             for i in range(img_metas.shape[0])
         ]
         return detections_list  

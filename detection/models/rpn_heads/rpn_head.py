@@ -98,11 +98,11 @@ class RPNHead(tf.keras.Model):
         
         rpn_probs = rpn_probs[:, :, 1]
         
-        img_shapes = calc_img_shapes(img_metas)
+        pad_shapes = calc_pad_shapes(img_metas)
         
         proposals_list = [
             self._get_proposals_single(
-                rpn_probs[i], rpn_deltas[i], anchors, valid_flags[i], img_shapes[i])
+                rpn_probs[i], rpn_deltas[i], anchors, valid_flags[i], pad_shapes[i])
             for i in range(img_metas.shape[0])
         ]
         

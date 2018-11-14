@@ -44,7 +44,7 @@ class ProposalTarget(object):
            images in one batch may have different num_rois and num_positive_rois.
         '''
         
-        img_shapes = calc_img_shapes(img_metas)
+        pad_shapes = calc_pad_shapes(img_metas)
         
         rois_list = []
         rcnn_target_matchs_list = []
@@ -52,7 +52,7 @@ class ProposalTarget(object):
         
         for i in range(img_metas.shape[0]):
             rois, target_matchs, target_deltas = self._build_single_target(
-                proposals_list[i], gt_boxes[i], gt_class_ids[i], img_shapes[i])
+                proposals_list[i], gt_boxes[i], gt_class_ids[i], pad_shapes[i])
             rois_list.append(rois)
             rcnn_target_matchs_list.append(target_matchs)
             rcnn_target_deltas_list.append(target_deltas)
