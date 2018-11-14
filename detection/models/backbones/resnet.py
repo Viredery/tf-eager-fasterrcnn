@@ -82,9 +82,9 @@ class ResNet(tf.keras.Model):
             raise AssertionError('depth must be 50 or 101.')
         self.depth = depth
     
+        self.padding = layers.ZeroPadding2D((3, 3))
         self.conv1 = layers.Conv2D(64, (7, 7),
                                    strides=(2, 2),
-                                   padding='same',
                                    kernel_initializer='he_normal',
                                    name='conv1')
         self.bn_conv1 = layers.BatchNormalization(name='bn_conv1')
@@ -136,7 +136,8 @@ class ResNet(tf.keras.Model):
         self.out_channel = (256, 512, 1024, 2048)
     
     def __call__(self, inputs, training=True):
-        x = self.conv1(inputs)
+        x = self.padding(inputs)
+        x = self.conv1(x)
         x = self.bn_conv1(x, training=training)
         x = tf.nn.relu(x)
         x = self.max_pool(x)
