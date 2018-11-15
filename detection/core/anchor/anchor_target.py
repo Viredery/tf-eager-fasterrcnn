@@ -54,7 +54,13 @@ class AnchorTarget(object):
             rpn_target_matchs.append(target_match)
             rpn_target_deltas.append(target_delta)
         
-        return tf.stack(rpn_target_matchs), tf.stack(rpn_target_deltas)
+        rpn_target_matchs = tf.stack(rpn_target_matchs)
+        rpn_target_deltas = tf.stack(rpn_target_deltas)
+        
+        rpn_target_matchs = tf.stop_gradient(rpn_target_matchs)
+        rpn_target_deltas = tf.stop_gradient(rpn_target_deltas)
+        
+        return rpn_target_matchs, rpn_target_deltas
 
     def _build_single_target(self, anchors, valid_flags, gt_boxes, gt_class_ids):
         '''Compute targets per instance.
@@ -141,11 +147,7 @@ class AnchorTarget(object):
         target_deltas = transforms.bbox2delta(
             a, gt, self.target_means, self.target_stds)
         
-        
         padding = tf.maximum(self.num_rpn_deltas - tf.shape(target_deltas)[0], 0)
         target_deltas = tf.pad(target_deltas, [(0, padding), (0, 0)])
-        
-        target_matchs = tf.stop_gradient(target_matchs)
-        target_deltas = tf.stop_gradient(target_deltas)
 
         return target_matchs, target_deltas

@@ -12,7 +12,8 @@ class CocoDataSet(object):
                  pad_mode='fixed',
                  mean=(0, 0, 0),
                  std=(1, 1, 1),
-                 scale=(1024, 800)):
+                 scale=(1024, 800),
+                 debug=False):
         '''Load a subset of the COCO dataset.
         
         Attributes
@@ -42,6 +43,9 @@ class CocoDataSet(object):
         
         self.img_ids, self.img_infos = self._filter_imgs()
         
+        if debug:
+            self.img_ids, self.img_infos = self.img_ids[:50], self.img_infos[:50]
+            
         self.image_dir = "{}/{}2017".format(dataset_dir, subset)
         
         self.flip_ratio = flip_ratio

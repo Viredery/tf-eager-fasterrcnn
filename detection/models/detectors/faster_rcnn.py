@@ -42,17 +42,20 @@ class FasterRCNN(tf.keras.Model):
         self.POOL_SIZE = (7, 7)
         
         
-        self.backbone = resnet.ResNet(depth=101)
-        self.neck = fpn.FPN()
+        self.backbone = resnet.ResNet(depth=101, name='res_net')
+        self.neck = fpn.FPN(name='fpn')
         self.rpn_head = rpn_head.RPNHead(anchors_per_location=len(self.ANCHOR_RATIOS),
                                          proposal_count=self.PRN_PROPOSAL_COUNT,
                                          nms_threshold=self.PRN_NMS_THRESHOLD,
                                          target_means=self.RPN_TARGET_MEANS,
-                                         target_stds=self.RPN_TARGET_STDS)
+                                         target_stds=self.RPN_TARGET_STDS,
+                                         name='rpn_head')
         
-        self.roi_align = roi_align.PyramidROIAlign(pool_shape=self.POOL_SIZE)
+        self.roi_align = roi_align.PyramidROIAlign(pool_shape=self.POOL_SIZE,
+                                                   name='pyramid_roi_align')
         self.bbox_head = bbox_head.BBoxHead(num_classes=self.NUM_CLASSES,
-                                            pool_size=self.POOL_SIZE)
+                                            pool_size=self.POOL_SIZE,
+                                            name='b_box_head')
         
         self.generator = anchor_generator.AnchorGenerator(
             scales=self.ANCHOR_SCALES, 
