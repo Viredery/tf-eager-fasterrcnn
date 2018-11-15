@@ -1,9 +1,6 @@
 # tf-eager-fasterrcnn
 Faster R-CNN R-50-FPN model was implemented with tensorflow eager execution. 
 
-(unfinished)
-
-
 # Requirements
 - Cuda 9.0
 - Python 3.5
@@ -12,6 +9,7 @@ Faster R-CNN R-50-FPN model was implemented with tensorflow eager execution.
 
 # Usage
 
+see `train_model.ipynb` and `inspect_model.ipynb`
 
 ### Download trained Faster R-CNN
 
