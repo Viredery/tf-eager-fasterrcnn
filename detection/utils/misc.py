@@ -24,6 +24,7 @@ def parse_image_meta(meta):
     ---
         a dict of the parsed tensors.
     '''
+    meta = meta.numpy()
     ori_shape = meta[..., 0:3]
     img_shape = meta[..., 3:6]
     pad_shape = meta[..., 6:9]

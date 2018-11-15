@@ -1,13 +1,23 @@
 # tf-eager-fasterrcnn
 Faster R-CNN R-50-FPN model was implemented with tensorflow eager execution. 
 
+(unfinished)
 
 
-using tf.keras and tf.data with eager execution
+# Requirements
+- Cuda 9.0
+- Python 3.5
+- TensorFlow 1.11
+- cv2
 
-至少使用 tensorflow 1.8.0 以上的版本
+# Usage
 
-模型代码主要参考 https://github.com/matterport/Mask_RCNN
-里面还有很多的代码没有实现、很多bugs、以及优化
 
-coding...
+### Download trained Faster R-CNN
+
+- [百度网盘](https://pan.baidu.com/s/1I5PGkpvnDSduJnngoWuktQ)
+
+
+# Reference
+
+- [matterport/Mask_RCNN](https://github.com/matterport/Mask_RCNN)

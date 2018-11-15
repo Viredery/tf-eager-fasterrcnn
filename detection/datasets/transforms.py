@@ -1,8 +1,10 @@
-import cv2
 import numpy as np
 
+from detection.datasets.utils import *
+
 class ImageTransform(object):
-    '''
+    '''Preprocess the image.
+    
         1. rescale the image to expected size
         2. normalize the image
         3. flip the image (if needed)
@@ -64,94 +66,3 @@ class BboxTransform(object):
         gt_bboxes[:, 1::2] = np.clip(gt_bboxes[:, 1::2], 0, img_shape[1])
             
         return gt_bboxes, labels.astype(np.int32)
-
-
-def img_flip(img):
-    return np.flip(img, axis=1)
-
-def bbox_flip(bboxes, img_shape):
-    '''Flip bboxes horizontally.
-    
-    Args
-    ---
-        bboxes: [..., 4]
-        img_shape: Tuple. (height, width)
-    '''
-    w = img_shape[1]
-    flipped = bboxes.copy()
-    flipped[..., 1] = w - bboxes[..., 3] - 1
-    flipped[..., 3] = w - bboxes[..., 1] - 1
-    return flipped
-
-
-def impad_to_square(img, pad_size):
-    '''Pad an image to ensure each edge to equal to pad_size.
-    
-    Args
-    ---
-        img: [height, width, channels]. Image to be padded
-        pad_size: Int.
-    
-    Returns
-    ---
-        ndarray: The padded image with shape of [pad_size, pad_size, channels].
-    '''
-    shape = (pad_size, pad_size, img.shape[-1])
-    
-    pad = np.zeros(shape, dtype=img.dtype)
-    
-    pad[:img.shape[0], :img.shape[1], ...] = img
-    return pad
-
-def impad_to_multiple(img, divisor):
-    '''Pad an image to ensure each edge to be multiple to some number.
-    
-    Args
-    ---
-        img: [height, width, channels]. Image to be padded.
-        divisor: Int. Padded image edges will be multiple to divisor.
-    
-    Returns
-    ---
-        ndarray: The padded image.
-    '''
-    pad_h = int(np.ceil(img.shape[0] / divisor)) * divisor
-    pad_w = int(np.ceil(img.shape[1] / divisor)) * divisor
-    
-    
-    shape = (pad_h, pad_w, img.shape[-1])
-    
-    pad = np.zeros(shape, dtype=img.dtype)
-    
-    pad[:img.shape[0], :img.shape[1], ...] = img
-    return pad
-
-def imrescale(img, scale):
-    '''Resize image while keeping the aspect ratio.
-    
-    Args
-    ---
-        img: [height, width, channels]. The input image.
-        scale: Tuple of 2 integers. the image will be rescaled 
-            as large as possible within the scale
-    '''
-    
-    h, w = img.shape[:2]
-    
-    max_long_edge = max(scale)
-    max_short_edge = min(scale)
-    scale_factor = min(max_long_edge / max(h, w),
-                       max_short_edge / min(h, w))
-    
-    new_size = (int(w * float(scale_factor) + 0.5),
-                int(h * float(scale_factor) + 0.5))
-
-    rescaled_img = cv2.resize(
-        img, new_size, interpolation=cv2.INTER_LINEAR)
-    
-    return rescaled_img, scale_factor
-
-def imnormalize(img, mean, std):
-    img = img.astype(np.float32)
-    return (img - mean) / std    
-    
