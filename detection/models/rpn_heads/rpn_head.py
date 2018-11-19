@@ -10,7 +10,8 @@ class RPNHead(tf.keras.Model):
                  proposal_count=2000, 
                  nms_threshold=0.7, 
                  target_means=(0., 0., 0., 0.), 
-                 target_stds=(0.1, 0.1, 0.2, 0.2), **kwags):
+                 target_stds=(0.1, 0.1, 0.2, 0.2), 
+                 **kwags):
         '''Network head of Region Proposal Network.
 
                                       / - rpn_cls (1x1 conv)
@@ -95,7 +96,6 @@ class RPNHead(tf.keras.Model):
         Note that num_proposals is no more than proposal_count. And different 
            images in one batch may have different num_proposals.
         '''
-        
         rpn_probs = rpn_probs[:, :, 1]
         
         pad_shapes = calc_pad_shapes(img_metas)
@@ -108,7 +108,6 @@ class RPNHead(tf.keras.Model):
         
         return proposals_list  
         
-    
     def _get_proposals_single(self, rpn_probs, rpn_deltas, anchors, valid_flags, img_shape):
         '''Calculate proposals.
         

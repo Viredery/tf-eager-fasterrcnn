@@ -1,7 +1,6 @@
 import tensorflow as tf
 
 from detection.core.bbox import geometry, transforms
-
 from detection.utils.misc import trim_zeros
 
 class AnchorTarget(object):
