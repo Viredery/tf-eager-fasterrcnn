@@ -119,8 +119,8 @@ def imnormalize(img, mean, std):
     ---
         np.ndarray: the normalized image.
     '''
-    img = img.astype(np.float32)
-    return (img - mean) / std    
+    img = (img - mean) / std    
+    return img.astype(np.float32)
 
 def imdenormalize(norm_img, mean, std):
     '''Denormalize the image.
@@ -130,8 +130,13 @@ def imdenormalize(norm_img, mean, std):
         norm_img: [height, width, channel]
         mean: Tuple or np.ndarray. [3]
         std: Tuple or np.ndarray. [3]
+    
+    Returns
+    ---
+        np.ndarray: the denormalized image.
     '''
-    return norm_img * std + mean
+    img = norm_img * std + mean
+    return img.astype(np.float32)
 
 #######################################
 #
