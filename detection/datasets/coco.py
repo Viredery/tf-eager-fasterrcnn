@@ -3,11 +3,10 @@ import cv2
 import numpy as np
 from pycocotools.coco import COCO
 
-from detection.datasets import transforms
+from detection.datasets import transforms, utils
 
 class CocoDataSet(object):
     def __init__(self, dataset_dir, subset,
-                 num_max_gts=1000,
                  flip_ratio=0,
                  pad_mode='fixed',
                  mean=(0, 0, 0),
@@ -20,7 +19,6 @@ class CocoDataSet(object):
         ---
             dataset_dir: The root directory of the COCO dataset.
             subset: What to load (train, val).
-            num_max_gts: Int. Maximum number of ground truth instances to use in one image.
             flip_ratio: Float. The ratio of flipping an image and its bounding boxes.
             pad_mode: Which padded method to use (fixed, non-fixed)
             mean: Tuple. Image mean.
@@ -49,7 +47,6 @@ class CocoDataSet(object):
         self.image_dir = "{}/{}2017".format(dataset_dir, subset)
         
         self.flip_ratio = flip_ratio
-        self.num_max_gts = num_max_gts
         
         if pad_mode in ['fixed', 'non-fixed']:
             self.pad_mode = pad_mode
@@ -59,7 +56,7 @@ class CocoDataSet(object):
             self.pad_mode = 'non-fixed'
         
         self.img_transform = transforms.ImageTransform(scale, mean, std, pad_mode)
-        self.bbox_transform = transforms.BboxTransform(num_max_gts)
+        self.bbox_transform = transforms.BboxTransform()
         
         
     def _filter_imgs(self, min_size=32):
@@ -165,8 +162,8 @@ class CocoDataSet(object):
         
         # Load the annotation.
         ann = self._parse_ann_info(ann_info)
-        bbox = ann['bboxes']
-        label = ann['labels']
+        bboxes = ann['bboxes']
+        labels = ann['labels']
         
         flip = True if np.random.rand() < self.flip_ratio else False
         
@@ -176,10 +173,9 @@ class CocoDataSet(object):
         pad_shape = img.shape
         
         # Handle the annotation.
-        bbox, label = self.bbox_transform(
-            bbox, label, img_shape, scale_factor, flip)
+        bboxes, labels = self.bbox_transform(
+            bboxes, labels, img_shape, scale_factor, flip)
         
-
         # Handle the meta info.
         img_meta_dict = dict({
             'ori_shape': ori_shape,
@@ -189,9 +185,9 @@ class CocoDataSet(object):
             'flip': flip
         })
 
-        img_meta = self._compose_image_meta(img_meta_dict)
+        img_meta = utils.compose_image_meta(img_meta_dict)
         
-        return img, img_meta, bbox, label
+        return img, img_meta, bboxes, labels
     
     def get_categories(self):
         '''Get list of category names. 
@@ -204,28 +200,3 @@ class CocoDataSet(object):
         '''
         return ['bg'] + [self.coco.loadCats(i)[0]["name"] for i in self.cat2label.keys()]
 
-    def _compose_image_meta(self, img_meta_dict):
-        '''Takes attributes of an image and puts them in one 1D array.
-        
-        Args
-        ---
-            img_meta_dict: dict
-        
-        Returns
-        ---
-            img_meta: np.ndarray
-        '''
-        ori_shape = img_meta_dict['ori_shape']
-        img_shape = img_meta_dict['img_shape']
-        pad_shape = img_meta_dict['pad_shape']
-        scale_factor = img_meta_dict['scale_factor']
-        flip = 1 if img_meta_dict['flip'] else 0
-        img_meta = np.array(
-            ori_shape +               # size=3
-            img_shape +               # size=3
-            pad_shape +               # size=3
-            tuple([scale_factor]) +   # size=1, float
-            tuple([flip])             # size=1
-        ).astype(np.float32)
-        
-        return img_meta

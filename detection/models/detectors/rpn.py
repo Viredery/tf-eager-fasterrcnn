@@ -24,8 +24,9 @@ class RPN(tf.keras.Model):
         
         self.backbone = resnet.ResNet(depth=101, name='res_net')
         self.neck = fpn.FPN(name='fpn')
-        self.rpn_head = rpn_head.RPNHead(anchors_per_location=len(self.ANCHOR_RATIOS),
-                                         name='rpn_head')
+        self.rpn_head = rpn_head.RPNHead(
+            anchors_per_location=len(self.ANCHOR_RATIOS),
+            name='rpn_head')
         
         self.generator = anchor_generator.AnchorGenerator(
             scales=self.ANCHOR_SCALES, 
