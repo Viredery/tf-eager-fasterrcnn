@@ -131,7 +131,11 @@ class RPNHead(tf.keras.Model):
         
         return rpn_class_loss, rpn_bbox_loss
     
-    def get_proposals(self, rpn_probs, rpn_deltas, img_metas):
+    def get_proposals(self, 
+                      rpn_probs, 
+                      rpn_deltas, 
+                      img_metas, 
+                      with_probs=False):
         '''Calculate proposals.
         
         Args
@@ -139,11 +143,14 @@ class RPNHead(tf.keras.Model):
             rpn_probs: [batch_size, num_anchors, (bg prob, fg prob)]
             rpn_deltas: [batch_size, num_anchors, (dy, dx, log(dh), log(dw))]
             img_metas: [batch_size, 11]
+            with_probs: bool.
         
         Returns
         ---
             proposals_list: list of [num_proposals, (y1, x1, y2, x2)] in 
-                normalized coordinates.
+                normalized coordinates if with_probs is False. 
+                Otherwise, the shape of proposals in proposals_list is 
+                [num_proposals, (y1, x1, y2, x2, score)]
         
         Note that num_proposals is no more than proposal_count. And different 
            images in one batch may have different num_proposals.
@@ -156,13 +163,19 @@ class RPNHead(tf.keras.Model):
         
         proposals_list = [
             self._get_proposals_single(
-                rpn_probs[i], rpn_deltas[i], anchors, valid_flags[i], pad_shapes[i])
+                rpn_probs[i], rpn_deltas[i], anchors, valid_flags[i], pad_shapes[i], with_probs)
             for i in range(img_metas.shape[0])
         ]
         
         return proposals_list
     
-    def _get_proposals_single(self, rpn_probs, rpn_deltas, anchors, valid_flags, img_shape):
+    def _get_proposals_single(self, 
+                              rpn_probs, 
+                              rpn_deltas, 
+                              anchors, 
+                              valid_flags, 
+                              img_shape, 
+                              with_probs):
         '''Calculate proposals.
         
         Args
@@ -173,6 +186,7 @@ class RPNHead(tf.keras.Model):
                 pixel coordinates.
             valid_flags: [num_anchors]
             img_shape: np.ndarray. [2]. (img_height, img_width)
+            with_probs: bool.
         
         Returns
         ---
@@ -212,6 +226,10 @@ class RPNHead(tf.keras.Model):
             proposals, rpn_probs, self.proposal_count, self.nms_threshold)
         proposals = tf.gather(proposals, indices)
         
+        if with_probs:
+            proposal_probs = tf.expand_dims(tf.gather(rpn_probs, indices), axis=1)
+            proposals = tf.concat([proposals, proposal_probs], axis=1)
+   
         return proposals
         
         

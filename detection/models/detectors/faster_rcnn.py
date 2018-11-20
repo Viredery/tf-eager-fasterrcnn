@@ -5,10 +5,11 @@ from detection.models.necks import fpn
 from detection.models.rpn_heads import rpn_head
 from detection.models.bbox_heads import bbox_head
 from detection.models.roi_extractors import roi_align
+from detection.models.detectors.test_mixins import RPNTestMixin, BBoxTestMixin
 
-from detection.core.bbox import bbox_target, transforms
+from detection.core.bbox import bbox_target
 
-class FasterRCNN(tf.keras.Model):
+class FasterRCNN(tf.keras.Model, RPNTestMixin, BBoxTestMixin):
     def __init__(self, num_classes, **kwags):
         super(FasterRCNN, self).__init__(**kwags)
        
@@ -146,25 +147,4 @@ class FasterRCNN(tf.keras.Model):
             detections_list = self.bbox_head.get_bboxes(
                 rcnn_probs_list, rcnn_deltas_list, rois_list, img_metas)
         
-            return self.unmold_detections(detections_list, img_metas)
-
-    def unmold_detections(self, detections_list, img_metas):
-        return [
-            self._unmold_single_detection(detections_list[i], img_metas[i])
-            for i in range(img_metas.shape[0])
-        ]
-
-    def _unmold_single_detection(self, detections, img_meta):
-        zero_ix = tf.where(tf.not_equal(detections[:, 4], 0))
-        detections = tf.gather_nd(detections, zero_ix)
-
-        # Extract boxes, class_ids, scores, and class-specific masks
-        boxes = detections[:, :4]
-        class_ids = tf.cast(detections[:, 4], tf.int32)
-        scores = detections[:, 5]
-
-        boxes = transforms.bbox_mapping_back(boxes, img_meta)
-
-        return {'rois': boxes.numpy(),
-                'class_ids': class_ids.numpy(),
-                'scores': scores.numpy()}
+            return detections_list

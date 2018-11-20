@@ -54,23 +54,23 @@ def calc_img_shapes(meta):
     '''
     Args
     ---
-        meta: [batch_size, 11]
+        meta: [..., 11]
     
     Returns
     ---
-        nd.ndarray. [batch_size, (height, width)]
+        nd.ndarray. [..., (height, width)]
     '''
-    return tf.cast(meta[:, 3:5], tf.int32).numpy()
+    return tf.cast(meta[..., 3:5], tf.int32).numpy()
 
 
 def calc_pad_shapes(meta):
     '''
     Args
     ---
-        meta: [batch_size, 11]
+        meta: [..., 11]
     
     Returns
     ---
-        nd.ndarray. [batch_size, (height, width)]
+        nd.ndarray. [..., (height, width)]
     '''
-    return tf.cast(meta[:, 6:8], tf.int32).numpy()
+    return tf.cast(meta[..., 6:8], tf.int32).numpy()
