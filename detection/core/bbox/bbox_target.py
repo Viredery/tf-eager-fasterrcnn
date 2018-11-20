@@ -5,23 +5,28 @@ from detection.core.bbox import geometry, transforms
 from detection.utils.misc import *
 
 class ProposalTarget(object):
-    def __init__(self, target_means, target_stds, num_rcnn_deltas=512):
+    def __init__(self,
+                 target_means=(0., 0., 0., 0.),
+                 target_stds=(0.1, 0.1, 0.2, 0.2), 
+                 num_rcnn_deltas=256,
+                 positive_fraction=0.25,
+                 pos_iou_thr=0.5,
+                 neg_iou_thr=0.5):
         '''Compute regression and classification targets for proposals.
         
         Attributes
         ---
             target_means: [4]. Bounding box refinement mean for RCNN.
-                Example: (0., 0., 0., 0.)
             target_stds: [4]. Bounding box refinement standard deviation for RCNN.
-                Example: (0.1, 0.1, 0.2, 0.2)
             num_rcnn_deltas: int. Maximal number of RoIs per image to feed to bbox heads.
+
         '''
-        self.target_means = tf.constant(target_means)
-        self.target_stds = tf.constant(target_stds)
-        self.num_rcnn_deltas = 512
-        self.roi_positive_fraction = 0.25
-        self.pos_iou_thr = 0.5
-        self.neg_iou_thr = 0.5
+        self.target_means = target_means
+        self.target_stds = target_stds
+        self.num_rcnn_deltas = num_rcnn_deltas
+        self.positive_fraction = positive_fraction
+        self.pos_iou_thr = pos_iou_thr
+        self.neg_iou_thr = neg_iou_thr
             
     def build_targets(self, proposals_list, gt_boxes, gt_class_ids, img_metas):
         '''Generates detection targets for images. Subsamples proposals and
@@ -93,12 +98,12 @@ class ProposalTarget(object):
         
         # Subsample ROIs. Aim for 33% positive
         # Positive ROIs
-        positive_count = int(self.num_rcnn_deltas * self.roi_positive_fraction)
+        positive_count = int(self.num_rcnn_deltas * self.positive_fraction)
         positive_indices = tf.random_shuffle(positive_indices)[:positive_count]
         positive_count = tf.shape(positive_indices)[0]
         
         # Negative ROIs. Add enough to maintain positive:negative ratio.
-        r = 1.0 / self.roi_positive_fraction
+        r = 1.0 / self.positive_fraction
         negative_count = tf.cast(r * tf.cast(positive_count, tf.float32), tf.int32) - positive_count
         negative_indices = tf.random_shuffle(negative_indices)[:negative_count]
         

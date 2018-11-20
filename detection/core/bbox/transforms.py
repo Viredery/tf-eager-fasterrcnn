@@ -12,6 +12,11 @@ def bbox2delta(box, gt_box, target_means, target_stds):
         target_means: [4]
         target_stds: [4]
     '''
+    target_means = tf.constant(
+        target_means, dtype=tf.float32)
+    target_stds = tf.constant(
+        target_stds, dtype=tf.float32)
+    
     box = tf.cast(box, tf.float32)
     gt_box = tf.cast(gt_box, tf.float32)
 
@@ -45,8 +50,11 @@ def delta2bbox(box, delta, target_means, target_stds):
         target_means: [4]
         target_stds: [4]
     '''
-    delta = delta * target_stds + target_means
-    
+    target_means = tf.constant(
+        target_means, dtype=tf.float32)
+    target_stds = tf.constant(
+        target_stds, dtype=tf.float32)
+    delta = delta * target_stds + target_means    
     # Convert to y, x, h, w
     height = box[:, 2] - box[:, 0]
     width = box[:, 3] - box[:, 1]

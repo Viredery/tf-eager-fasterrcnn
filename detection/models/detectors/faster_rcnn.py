@@ -3,13 +3,8 @@ import tensorflow as tf
 from detection.models.backbones import resnet
 from detection.models.necks import fpn
 from detection.models.rpn_heads import rpn_head
-
 from detection.models.bbox_heads import bbox_head
 from detection.models.roi_extractors import roi_align
-
-
-from detection.core.anchor import anchor_generator, anchor_target
-from detection.core.loss import losses
 
 from detection.core.bbox import bbox_target, transforms
 
@@ -19,63 +14,89 @@ class FasterRCNN(tf.keras.Model):
        
         self.NUM_CLASSES = num_classes
         
+        # RPN configuration
         # Anchor attributes
         self.ANCHOR_SCALES = (32, 64, 128, 256, 512)
         self.ANCHOR_RATIOS = (0.5, 1, 2)
-        
-        # The strides of each layer of the FPN Pyramid.
-        self.FEATURE_STRIDES = (4, 8, 16, 32, 64)
+        self.ANCHOR_FEATURE_STRIDES = (4, 8, 16, 32, 64)
         
         # Bounding box refinement mean and standard deviation
         self.RPN_TARGET_MEANS = (0., 0., 0., 0.)
         self.RPN_TARGET_STDS = (0.1, 0.1, 0.2, 0.2)
         
+        # RPN training configuration
+        self.PRN_BATCH_SIZE = 256
+        self.RPN_POS_FRAC = 0.5
+        self.RPN_POS_IOU_THR = 0.7
+        self.RPN_NEG_IOU_THR = 0.3
+
+        # ROIs kept configuration
         self.PRN_PROPOSAL_COUNT = 2000
         self.PRN_NMS_THRESHOLD = 0.7
         
-        self.ROI_BATCH_SIZE = 512
-        
+        # RCNN configuration
         # Bounding box refinement mean and standard deviation
         self.RCNN_TARGET_MEANS = (0., 0., 0., 0.)
         self.RCNN_TARGET_STDS = (0.1, 0.1, 0.2, 0.2)
         
+        # ROI Feat Size
         self.POOL_SIZE = (7, 7)
         
+        # RCNN training configuration
+        self.RCNN_BATCH_SIZE = 256
+        self.RCNN_POS_FRAC = 0.25
+        self.RCNN_POS_IOU_THR = 0.5
+        self.RCNN_NEG_IOU_THR = 0.5
         
-        self.backbone = resnet.ResNet(depth=101, name='res_net')
-        self.neck = fpn.FPN(name='fpn')
-        self.rpn_head = rpn_head.RPNHead(anchors_per_location=len(self.ANCHOR_RATIOS),
-                                         proposal_count=self.PRN_PROPOSAL_COUNT,
-                                         nms_threshold=self.PRN_NMS_THRESHOLD,
-                                         target_means=self.RPN_TARGET_MEANS,
-                                         target_stds=self.RPN_TARGET_STDS,
-                                         name='rpn_head')
+        # Boxes kept configuration
+        self.RCNN_MIN_CONFIDENCE = 0.7
+        self.RCNN_NME_THRESHOLD = 0.3
+        self.RCNN_MAX_INSTANCES = 100
         
-        self.roi_align = roi_align.PyramidROIAlign(pool_shape=self.POOL_SIZE,
-                                                   name='pyramid_roi_align')
-        self.bbox_head = bbox_head.BBoxHead(num_classes=self.NUM_CLASSES,
-                                            pool_size=self.POOL_SIZE,
-                                            name='b_box_head')
-        
-        self.generator = anchor_generator.AnchorGenerator(
-            scales=self.ANCHOR_SCALES, 
-            ratios=self.ANCHOR_RATIOS, 
-            feature_strides=self.FEATURE_STRIDES)
-        
-        self.anchor_target = anchor_target.AnchorTarget(
-            target_means=self.RPN_TARGET_MEANS, 
-            target_stds=self.RPN_TARGET_STDS)
-        
+        # Target Generator for the second stage.
         self.bbox_target = bbox_target.ProposalTarget(
             target_means=self.RCNN_TARGET_MEANS,
             target_stds=self.RPN_TARGET_STDS, 
-            num_rcnn_deltas=self.ROI_BATCH_SIZE)
+            num_rcnn_deltas=self.RCNN_BATCH_SIZE,
+            positive_fraction=self.RCNN_POS_FRAC,
+            pos_iou_thr=self.RCNN_POS_IOU_THR,
+            neg_iou_thr=self.RCNN_NEG_IOU_THR)
+                
+        # Modules
+        self.backbone = resnet.ResNet(
+            depth=101, 
+            name='res_net')
         
-        self.rpn_class_loss = losses.rpn_class_loss
-        self.rpn_bbox_loss = losses.rpn_bbox_loss
+        self.neck = fpn.FPN(
+            name='fpn')
         
-        self.rcnn_class_loss = losses.rcnn_class_loss
-        self.rcnn_bbox_loss = losses.rcnn_bbox_loss
+        self.rpn_head = rpn_head.RPNHead(
+            anchor_scales=self.ANCHOR_SCALES,
+            anchor_ratios=self.ANCHOR_RATIOS,
+            anchor_feature_strides=self.ANCHOR_FEATURE_STRIDES,
+            proposal_count=self.PRN_PROPOSAL_COUNT,
+            nms_threshold=self.PRN_NMS_THRESHOLD,
+            target_means=self.RPN_TARGET_MEANS,
+            target_stds=self.RPN_TARGET_STDS,
+            num_rpn_deltas=self.PRN_BATCH_SIZE,
+            positive_fraction=self.RPN_POS_FRAC,
+            pos_iou_thr=self.RPN_POS_IOU_THR,
+            neg_iou_thr=self.RPN_NEG_IOU_THR,
+            name='rpn_head')
+        
+        self.roi_align = roi_align.PyramidROIAlign(
+            pool_shape=self.POOL_SIZE,
+            name='pyramid_roi_align')
+        
+        self.bbox_head = bbox_head.BBoxHead(
+            num_classes=self.NUM_CLASSES,
+            pool_size=self.POOL_SIZE,
+            target_means=self.RCNN_TARGET_MEANS,
+            target_stds=self.RCNN_TARGET_STDS,
+            min_confidence=self.RCNN_MIN_CONFIDENCE,
+            nms_threshold=self.RCNN_NME_THRESHOLD,
+            max_instances=self.RCNN_MAX_INSTANCES,
+            name='b_box_head')
 
     def __call__(self, inputs, training=True):      
         if training: # training
@@ -91,20 +112,12 @@ class FasterRCNN(tf.keras.Model):
         
         rpn_feature_maps = [P2, P3, P4, P5, P6]
         rcnn_feature_maps = [P2, P3, P4, P5]
-        
-        layer_outputs = []
-        for p in rpn_feature_maps:
-            layer_outputs.append(self.rpn_head(p, training=training))
-        
-        outputs = list(zip(*layer_outputs))
-        outputs = [tf.concat(list(o), axis=1) for o in outputs]
-        
-        rpn_class_logits, rpn_probs, rpn_deltas = outputs
-        
-        anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
+
+        rpn_class_logits, rpn_probs, rpn_deltas = self.rpn_head(
+            rpn_feature_maps, training=training)
         
         proposals_list = self.rpn_head.get_proposals(
-            rpn_probs, rpn_deltas, anchors, valid_flags, img_metas)
+            rpn_probs, rpn_deltas, img_metas)
         
         if training:
             rois_list, rcnn_target_matchs_list, rcnn_target_deltas_list = \
@@ -119,20 +132,13 @@ class FasterRCNN(tf.keras.Model):
         rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = \
             self.bbox_head(pooled_regions_list, training=training)
 
-        if training:
-            rpn_target_matchs, rpn_target_deltas = self.anchor_target.build_targets(
-                anchors, valid_flags, gt_boxes, gt_class_ids)
+        if training:         
+            rpn_class_loss, rpn_bbox_loss = self.rpn_head.loss(
+                rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids, img_metas)
             
-            rpn_class_loss = self.rpn_class_loss(
-                rpn_target_matchs, rpn_class_logits)
-            rpn_bbox_loss = self.rpn_bbox_loss(
-                rpn_target_deltas, rpn_target_matchs, rpn_deltas)
-
-            rcnn_class_loss = self.rcnn_class_loss(
-                rcnn_target_matchs_list, rcnn_class_logits_list)
-            rcnn_bbox_loss = self.rcnn_bbox_loss(
-                rcnn_target_deltas_list, rcnn_target_matchs_list, rcnn_deltas_list)            
-            
+            rcnn_class_loss, rcnn_bbox_loss = self.bbox_head.loss(
+                rcnn_class_logits_list, rcnn_deltas_list, 
+                rcnn_target_matchs_list, rcnn_target_deltas_list)
             
             return [rpn_class_loss, rpn_bbox_loss, 
                     rcnn_class_loss, rcnn_bbox_loss]

@@ -2,27 +2,30 @@ import tensorflow as tf
 layers = tf.keras.layers
 
 from detection.core.bbox import transforms
+from detection.core.loss import losses
 from detection.utils.misc import *
 
 class BBoxHead(tf.keras.Model):
     def __init__(self, num_classes, 
                  pool_size=(7, 7),
+                 target_means=(0., 0., 0., 0.), 
+                 target_stds=(0.1, 0.1, 0.2, 0.2),
                  min_confidence=0.7,
                  nms_threshold=0.3,
                  max_instances=100,
-                 target_means=(0., 0., 0., 0.), 
-                 target_stds=(0.1, 0.1, 0.2, 0.2),
                  **kwags):
         super(BBoxHead, self).__init__(**kwags)
         
-        self.pool_size = tuple(pool_size)
         self.num_classes = num_classes
-        
+        self.pool_size = tuple(pool_size)
+        self.target_means = target_means
+        self.target_stds = target_stds
         self.min_confidence = min_confidence
         self.nms_threshold = nms_threshold
         self.max_instances = max_instances
-        self.target_means = target_means
-        self.target_stds = target_stds
+        
+        self.rcnn_class_loss = losses.rcnn_class_loss
+        self.rcnn_bbox_loss = losses.rcnn_bbox_loss
         
         self.rcnn_class_conv1 = layers.Conv2D(1024, self.pool_size, 
                                               padding='valid', name='rcnn_class_conv1')
@@ -78,6 +81,18 @@ class BBoxHead(tf.keras.Model):
             
         return rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list
 
+    def loss(self, 
+             rcnn_class_logits_list, rcnn_deltas_list, 
+             rcnn_target_matchs_list, rcnn_target_deltas_list):
+        '''Calculate RCNN loss
+        '''
+        rcnn_class_loss = self.rcnn_class_loss(
+            rcnn_target_matchs_list, rcnn_class_logits_list)
+        rcnn_bbox_loss = self.rcnn_bbox_loss(
+            rcnn_target_deltas_list, rcnn_target_matchs_list, rcnn_deltas_list)
+        
+        return rcnn_class_loss, rcnn_bbox_loss
+        
     def get_bboxes(self, rcnn_probs_list, rcnn_deltas_list, rois_list, img_metas):
         '''
         Args

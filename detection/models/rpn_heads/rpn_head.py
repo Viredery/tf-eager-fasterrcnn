@@ -4,13 +4,22 @@ layers = tf.keras.layers
 from detection.core.bbox import transforms
 from detection.utils.misc import *
 
+from detection.core.anchor import anchor_generator, anchor_target
+from detection.core.loss import losses
+
 class RPNHead(tf.keras.Model):
     def __init__(self, 
-                 anchors_per_location, 
+                 anchor_scales=(32, 64, 128, 256, 512), 
+                 anchor_ratios=(0.5, 1, 2), 
+                 anchor_feature_strides=(4, 8, 16, 32, 64),
                  proposal_count=2000, 
                  nms_threshold=0.7, 
                  target_means=(0., 0., 0., 0.), 
                  target_stds=(0.1, 0.1, 0.2, 0.2), 
+                 num_rpn_deltas=256,
+                 positive_fraction=0.5,
+                 pos_iou_thr=0.7,
+                 neg_iou_thr=0.3,
                  **kwags):
         '''Network head of Region Proposal Network.
 
@@ -20,33 +29,55 @@ class RPNHead(tf.keras.Model):
 
         Attributes
         ---
-            anchors_per_location: int. the number of anchors per pixel 
-                in the feature maps.
+            anchor_scales: 1D array of anchor sizes in pixels.
+            anchor_ratios: 1D array of anchor ratios of width/height.
+            anchor_feature_strides: Stride of the feature map relative 
+                to the image in pixels.
             proposal_count: int. RPN proposals kept after non-maximum 
                 supression.
             nms_threshold: float. Non-maximum suppression threshold to 
                 filter RPN proposals.
             target_means: [4] Bounding box refinement mean.
             target_stds: [4] Bounding box refinement standard deviation.
+            num_rpn_deltas: int.
+            positive_fraction: float.
+            pos_iou_thr: float.
+            neg_iou_thr: float.
         '''
         super(RPNHead, self).__init__(**kwags)
         
-        self.anchors_per_location = anchors_per_location
         self.proposal_count = proposal_count
         self.nms_threshold = nms_threshold
-        self.target_means = tf.constant(target_means)
-        self.target_stds = tf.constant(target_stds)
+        self.target_means = target_means
+        self.target_stds = target_stds
+
+        self.generator = anchor_generator.AnchorGenerator(
+            scales=anchor_scales, 
+            ratios=anchor_ratios, 
+            feature_strides=anchor_feature_strides)
+        
+        self.anchor_target = anchor_target.AnchorTarget(
+            target_means=target_means, 
+            target_stds=target_stds,
+            num_rpn_deltas=num_rpn_deltas,
+            positive_fraction=positive_fraction,
+            pos_iou_thr=pos_iou_thr,
+            neg_iou_thr=neg_iou_thr)
+        
+        self.rpn_class_loss = losses.rpn_class_loss
+        self.rpn_bbox_loss = losses.rpn_bbox_loss
+        
         
         # Shared convolutional base of the RPN
         self.rpn_conv_shared = layers.Conv2D(512, (3, 3), padding='same',
                                              kernel_initializer='he_normal', 
                                              name='rpn_conv_shared')
         
-        self.rpn_class_raw = layers.Conv2D(2 * anchors_per_location, (1, 1),
+        self.rpn_class_raw = layers.Conv2D(2 * len(anchor_ratios), (1, 1),
                                            kernel_initializer='he_normal', 
                                            name='rpn_class_raw')
 
-        self.rpn_delta_pred = layers.Conv2D(anchors_per_location * 4, (1, 1),
+        self.rpn_delta_pred = layers.Conv2D(len(anchor_ratios) * 4, (1, 1),
                                            kernel_initializer='he_normal', 
                                            name='rpn_bbox_pred')
         
@@ -64,28 +95,49 @@ class RPNHead(tf.keras.Model):
             rpn_deltas: [batch_size, num_anchors, 4]
         '''
         
-        shared = self.rpn_conv_shared(inputs)
-        shared = tf.nn.relu(shared)
+        layer_outputs = []
         
-        x = self.rpn_class_raw(shared)
-        rpn_class_logits = tf.reshape(x, [tf.shape(x)[0], -1, 2])
-        rpn_probs = tf.nn.softmax(rpn_class_logits)
+        for feat in inputs:
+            shared = self.rpn_conv_shared(feat)
+            shared = tf.nn.relu(shared)
+
+            x = self.rpn_class_raw(shared)
+            rpn_class_logits = tf.reshape(x, [tf.shape(x)[0], -1, 2])
+            rpn_probs = tf.nn.softmax(rpn_class_logits)
+
+            x = self.rpn_delta_pred(shared)
+            rpn_deltas = tf.reshape(x, [tf.shape(x)[0], -1, 4])
+            
+            layer_outputs.append([rpn_class_logits, rpn_probs, rpn_deltas])
+
+        outputs = list(zip(*layer_outputs))
+        outputs = [tf.concat(list(o), axis=1) for o in outputs]
+        rpn_class_logits, rpn_probs, rpn_deltas = outputs
         
-        x = self.rpn_delta_pred(shared)
-        rpn_deltas = tf.reshape(x, [tf.shape(x)[0], -1, 4])
+        return rpn_class_logits, rpn_probs, rpn_deltas
+
+    def loss(self, rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids, img_metas):
+        '''Calculate rpn loss
+        '''
+        anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
         
-        return [rpn_class_logits, rpn_probs, rpn_deltas]
+        rpn_target_matchs, rpn_target_deltas = self.anchor_target.build_targets(
+            anchors, valid_flags, gt_boxes, gt_class_ids)
+        
+        rpn_class_loss = self.rpn_class_loss(
+            rpn_target_matchs, rpn_class_logits)
+        rpn_bbox_loss = self.rpn_bbox_loss(
+            rpn_target_deltas, rpn_target_matchs, rpn_deltas)
+        
+        return rpn_class_loss, rpn_bbox_loss
     
-    def get_proposals(self, rpn_probs, rpn_deltas, anchors, valid_flags, img_metas):
+    def get_proposals(self, rpn_probs, rpn_deltas, img_metas):
         '''Calculate proposals.
         
         Args
         ---
             rpn_probs: [batch_size, num_anchors, (bg prob, fg prob)]
             rpn_deltas: [batch_size, num_anchors, (dy, dx, log(dh), log(dw))]
-            anchors: [num_anchors, (y1, x1, y2, x2)] anchors defined in pixel 
-                coordinates.
-            valid_flags: [batch_size, num_anchors]
             img_metas: [batch_size, 11]
         
         Returns
@@ -96,6 +148,8 @@ class RPNHead(tf.keras.Model):
         Note that num_proposals is no more than proposal_count. And different 
            images in one batch may have different num_proposals.
         '''
+        anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
+        
         rpn_probs = rpn_probs[:, :, 1]
         
         pad_shapes = calc_pad_shapes(img_metas)
@@ -106,8 +160,8 @@ class RPNHead(tf.keras.Model):
             for i in range(img_metas.shape[0])
         ]
         
-        return proposals_list  
-        
+        return proposals_list
+    
     def _get_proposals_single(self, rpn_probs, rpn_deltas, anchors, valid_flags, img_shape):
         '''Calculate proposals.
         
@@ -160,10 +214,4 @@ class RPNHead(tf.keras.Model):
         
         return proposals
         
-    def compute_output_shape(self, input_shape):
-        batch, height, width, channel = input_shape.as_list()
-        
-        return [tf.TensorShape([batch, height * width * self.anchors_per_location, 2]),
-                tf.TensorShape([batch, height * width * self.anchors_per_location, 2]),
-                tf.TensorShape([batch, height * width * self.anchors_per_location, 4])]
         

@@ -4,25 +4,30 @@ from detection.core.bbox import geometry, transforms
 from detection.utils.misc import trim_zeros
 
 class AnchorTarget(object):
-    def __init__(self, target_means, target_stds):
+    def __init__(self,
+                 target_means=(0., 0., 0., 0.), 
+                 target_stds=(0.1, 0.1, 0.2, 0.2),
+                 num_rpn_deltas=256,
+                 positive_fraction=0.5,
+                 pos_iou_thr=0.7,
+                 neg_iou_thr=0.3):
         '''Compute regression and classification targets for anchors.
         
         Attributes
         ---
             target_means: [4]. Bounding box refinement mean for RPN.
-                Example: (0., 0., 0., 0.)
             target_stds: [4]. Bounding box refinement standard deviation for RPN.
-                Example: (0.1, 0.1, 0.2, 0.2)
+            num_rpn_deltas: int. Maximal number of Anchors per image to feed to rpn heads.
+            positive_fraction: float.
+            pos_iou_thr: float.
+            neg_iou_thr: float.
         '''
-        self.target_means = tf.constant(target_means)
-        self.target_stds = tf.constant(target_stds)
-        
-        self.pos_iou_thr = 0.7
-        self.neg_iou_thr = 0.3
-        
-        self.num_rpn_deltas = 256
-        self.pos_fraction = 0.5
-
+        self.target_means = target_means
+        self.target_stds = target_stds
+        self.num_rpn_deltas = num_rpn_deltas
+        self.positive_fraction = positive_fraction
+        self.pos_iou_thr = pos_iou_thr
+        self.neg_iou_thr = neg_iou_thr
 
     def build_targets(self, anchors, valid_flags, gt_boxes, gt_class_ids):
         '''Given the anchors and GT boxes, compute overlaps and identify positive
@@ -119,7 +124,7 @@ class AnchorTarget(object):
         # Don't let positives be more than half the anchors
         ids = tf.where(tf.equal(target_matchs, 1))
         ids = tf.squeeze(ids, 1)
-        extra = ids.shape.as_list()[0] - (self.num_rpn_deltas // 2)
+        extra = ids.shape.as_list()[0] - int(self.num_rpn_deltas * self.positive_fraction)
         if extra > 0:
             # Reset the extra ones to neutral
             ids = tf.random_shuffle(ids)[:extra]

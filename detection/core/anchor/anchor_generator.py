@@ -3,15 +3,17 @@ import tensorflow as tf
 from detection.utils.misc import *
 
 class AnchorGenerator(object):
-    def __init__(self, scales, ratios, feature_strides):
+    def __init__(self, 
+                 scales=(32, 64, 128, 256, 512), 
+                 ratios=(0.5, 1, 2), 
+                 feature_strides=(4, 8, 16, 32, 64)):
         '''Anchor Generator
         
         Attributes
         ---
-            scales: 1D array of anchor sizes in pixels. Example: (32, 64, 128, 256, 512)
-            ratios: 1D array of anchor ratios of width/height. Example: (0.5, 1, 2)
+            scales: 1D array of anchor sizes in pixels.
+            ratios: 1D array of anchor ratios of width/height.
             feature_strides: Stride of the feature map relative to the image in pixels.
-                Example: (4, 8, 16, 32, 64)
         '''
         self.scales = scales
         self.ratios = ratios
@@ -22,13 +24,14 @@ class AnchorGenerator(object):
         
         Args
         ---
-            img_metas
+            img_metas: [batch_size, 11]
         
         Returns
         ---
             anchors: [num_anchors, (y1, x1, y2, x2)] in image coordinates.
             valid_flags: [batch_size, num_anchors]
         '''
+        # generate anchors
         pad_shape = calc_batch_padded_shape(img_metas)
         
         feature_shapes = [(pad_shape[0] // stride, pad_shape[1] // stride)
@@ -39,6 +42,7 @@ class AnchorGenerator(object):
         ]
         anchors = tf.concat(anchors, axis=0)
 
+        # generate valid flags
         img_shapes = calc_img_shapes(img_metas)
         valid_flags = [
             self._generate_valid_flags(anchors, img_shapes[i])
@@ -50,7 +54,6 @@ class AnchorGenerator(object):
         valid_flags = tf.stop_gradient(valid_flags)
         
         return anchors, valid_flags
-    
     
     def _generate_valid_flags(self, anchors, img_shape):
         '''
