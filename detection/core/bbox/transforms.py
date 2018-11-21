@@ -112,6 +112,24 @@ def bbox_flip(bboxes, width):
     return flipped
 
 
+
+def bbox_mapping(box, img_meta):
+    '''
+    Args
+    ---
+        box: [N, 4]
+        img_meta: [11]
+    '''
+    img_meta = parse_image_meta(img_meta)
+    scale = img_meta['scale']
+    flip = img_meta['flip']
+    
+    box = box * scale
+    if tf.equal(flip, 1):
+        box = bbox_flip(box, img_meta['img_shape'][1])
+    
+    return box
+
 def bbox_mapping_back(box, img_meta):
     '''
     Args

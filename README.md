@@ -18,6 +18,17 @@ see `train_model.ipynb` and `inspect_model.ipynb`
 - [百度网盘](https://pan.baidu.com/s/1I5PGkpvnDSduJnngoWuktQ)
 
 
+# Updating
+
+- [ ] evaluation utils
+- [ ] training without for-loop when batch size > 1
+- [ ] TTA (multi-scale testing and flip)
+- [ ] online hard examples mining
+- [ ] multi-scale training
+- [ ] soft-nms
+- [ ] balanced sampling and negative samples training (maybe)
+
+
 # Acknowledgement
 
 This work builds on many excellent works, which include:
