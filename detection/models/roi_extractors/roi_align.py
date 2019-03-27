@@ -18,36 +18,28 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         '''
         Args
         ---
-            rois_list: list of [num_rois, (y1, x1, y2, x2)] in normalized coordinates.
-            feature_map_list: List of [batch, height, width, channels].
+            rois: [batch_size * num_rois, (batch_ind, y1, x1, y2, x2)] in normalized coordinates.
+            feature_map_list: List of [batch_size, height, width, channels].
                 feature maps from different levels of the pyramid.
             img_metas: [batch_size, 11]
 
         Returns
         ---
-            pooled_rois_list: list of [num_rois, pooled_height, pooled_width, channels].
+            pooled_rois_list: list of [batch_size * num_rois, pooled_height, pooled_width, channels].
                 The width and height are those specific in the pool_shape in the layer
                 constructor.
         '''
-        rois_list, feature_map_list, img_metas = inputs
+        rois, feature_map_list, img_metas = inputs
 
         pad_shapes = calc_pad_shapes(img_metas)
         
         pad_areas = pad_shapes[:, 0] * pad_shapes[:, 1]
         
-        num_rois_list = [rois.shape.as_list()[0] for rois in rois_list]
-        roi_indices = tf.constant(
-            [i for i in range(len(rois_list)) for _ in range(rois_list[i].shape.as_list()[0])],
-            dtype=tf.int32
-        )
+        roi_indices = tf.cast(rois[:, 0], tf.int32)
+        rois = rois[:, 1:]
         
-        areas = tf.constant(
-            [pad_areas[i] for i in range(pad_areas.shape[0]) for _ in range(num_rois_list[i])],
-            dtype=tf.float32
-        )
+        areas = tf.cast(pad_areas[0], tf.float32)
 
-
-        rois = tf.concat(rois_list, axis=0)
         
         # Assign each ROI to a level in the pyramid based on the ROI area.
         y1, x1, y2, x2 = tf.split(rois, 4, axis=1)
@@ -80,6 +72,7 @@ class PyramidROIAlign(tf.keras.layers.Layer):
             # Stop gradient propogation to ROI proposals
             level_rois = tf.stop_gradient(level_rois)
             level_roi_indices = tf.stop_gradient(level_roi_indices)
+            
 
             # Crop and Resize
             # From Mask R-CNN paper: "We sample four regular locations, so
@@ -113,5 +106,4 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         ix = tf.gather(roi_to_level[:, 1], ix)
         pooled_rois = tf.gather(pooled_rois, ix)
         
-        pooled_rois_list = tf.split(pooled_rois, num_rois_list, axis=0)
-        return pooled_rois_list
+        return pooled_rois

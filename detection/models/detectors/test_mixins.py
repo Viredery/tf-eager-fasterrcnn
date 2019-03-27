@@ -22,10 +22,10 @@ class RPNTestMixin(object):
         
         rpn_class_logits, rpn_probs, rpn_deltas = self.rpn_head(x, training=False)
         
-        proposals_list = self.rpn_head.get_proposals(
+        proposals = self.rpn_head.get_proposals(
             rpn_probs, rpn_deltas, img_metas, with_probs=False)
 
-        return proposals_list[0]
+        return proposals
     
 class BBoxTestMixin(object):
     
@@ -60,21 +60,21 @@ class BBoxTestMixin(object):
         '''
         imgs = tf.Variable(np.expand_dims(img, 0))
         img_metas = tf.Variable(np.expand_dims(img_meta, 0))
-        rois_list = [tf.Variable(proposals)]
-        
+        rois = tf.Variable(proposals)
+
         x = self.backbone(imgs, training=False)
         P2, P3, P4, P5, _ = self.neck(x, training=False)
         
         rcnn_feature_maps = [P2, P3, P4, P5]
         
         
-        pooled_regions_list = self.roi_align(
-            (rois_list, rcnn_feature_maps, img_metas), training=False)
+        pooled_regions = self.roi_align(
+            (rois, rcnn_feature_maps, img_metas), training=False)
 
-        rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = \
-            self.bbox_head(pooled_regions_list, training=False)
+        rcnn_class_logits, rcnn_probs, rcnn_deltas = \
+            self.bbox_head(pooled_regions, training=False)
         
         detections_list = self.bbox_head.get_bboxes(
-            rcnn_probs_list, rcnn_deltas_list, rois_list, img_metas)
+            rcnn_probs, rcnn_deltas, rois, img_metas)
         
         return self._unmold_detections(detections_list, img_metas)[0]

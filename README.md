@@ -21,8 +21,8 @@ see `train_model.ipynb` and `inspect_model.ipynb`
 # Updating
 
 - [ ] evaluation utils
-- [ ] training without for-loop when batch size > 1
-- [ ] TTA (multi-scale testing and flip)
+- [x] training without for-loop when batch size > 1
+- [ ] TTA (multi-scale testing, flip and box voting)
 - [ ] online hard examples mining
 - [ ] multi-scale training
 - [ ] soft-nms

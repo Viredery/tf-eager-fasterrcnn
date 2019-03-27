@@ -45,17 +45,15 @@ class BBoxHead(tf.keras.Model):
         '''
         Args
         ---
-            pooled_rois_list: List of [num_rois, pool_size, pool_size, channels]
+            pooled_rois: [batch_size * num_rois, pool_size, pool_size, channels]
         
         Returns
         ---
-            rcnn_class_logits_list: List of [num_rois, num_classes]
-            rcnn_probs_list: List of [num_rois, num_classes]
-            rcnn_deltas_list: List of [num_rois, num_classes, (dy, dx, log(dh), log(dw))]
+            rcnn_class_logits: [batch_size * num_rois, num_classes]
+            rcnn_probs: [batch_size * num_rois, num_classes]
+            rcnn_deltas: [batch_size * num_rois, num_classes, (dy, dx, log(dh), log(dw))]
         '''
-        pooled_rois_list = inputs
-        num_pooled_rois_list = [pooled_rois.shape[0] for pooled_rois in pooled_rois_list]
-        pooled_rois = tf.concat(pooled_rois_list, axis=0)
+        pooled_rois = inputs
         
         x = self.rcnn_class_conv1(pooled_rois)
         x = self.rcnn_class_bn1(x, training=training)
@@ -73,33 +71,27 @@ class BBoxHead(tf.keras.Model):
         deltas = self.rcnn_delta_fc(x)
         deltas = tf.reshape(deltas, (-1, self.num_classes, 4))
         
-
-        rcnn_class_logits_list = tf.split(logits, num_pooled_rois_list, 0)
-        rcnn_probs_list = tf.split(probs, num_pooled_rois_list, 0)
-        rcnn_deltas_list = tf.split(deltas, num_pooled_rois_list, 0)
-
-            
-        return rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list
+        return logits, probs, deltas
 
     def loss(self, 
-             rcnn_class_logits_list, rcnn_deltas_list, 
-             rcnn_target_matchs_list, rcnn_target_deltas_list):
+             rcnn_class_logits, rcnn_deltas, 
+             rcnn_target_matchs, rcnn_target_deltas):
         '''Calculate RCNN loss
         '''
         rcnn_class_loss = self.rcnn_class_loss(
-            rcnn_target_matchs_list, rcnn_class_logits_list)
+            rcnn_target_matchs, rcnn_class_logits)
         rcnn_bbox_loss = self.rcnn_bbox_loss(
-            rcnn_target_deltas_list, rcnn_target_matchs_list, rcnn_deltas_list)
+            rcnn_target_deltas, rcnn_target_matchs, rcnn_deltas)
         
         return rcnn_class_loss, rcnn_bbox_loss
         
-    def get_bboxes(self, rcnn_probs_list, rcnn_deltas_list, rois_list, img_metas):
+    def get_bboxes(self, rcnn_probs, rcnn_deltas, rois, img_metas):
         '''
         Args
         ---
-            rcnn_probs_list: List of [num_rois, num_classes]
-            rcnn_deltas_list: List of [num_rois, num_classes, (dy, dx, log(dh), log(dw))]
-            rois_list: List of [num_rois, (y1, x1, y2, x2)]
+            rcnn_probs: [batch_size * num_rois, num_classes]
+            rcnn_deltas: [batch_size * num_rois, num_classes, (dy, dx, log(dh), log(dw))]
+            rois: [batch_size * num_rois, (batch_ind, y1, x1, y2, x2)]
             img_meta_list: [batch_size, 11]
         
         Returns
@@ -107,14 +99,20 @@ class BBoxHead(tf.keras.Model):
             detections_list: List of [num_detections, (y1, x1, y2, x2, class_id, score)]
                 coordinates are in pixel coordinates.
         '''
+        batch_size = img_metas.shape[0]
+        rcnn_probs = tf.reshape(rcnn_probs, (batch_size, -1, self.num_classes))
+        rcnn_deltas = tf.reshape(rcnn_deltas, (batch_size, -1, self.num_classes, 4))
+        rois = tf.reshape(rois, (batch_size, -1, 5))[:, :, 1:5]
         
         pad_shapes = calc_pad_shapes(img_metas)
+        
+        
         detections_list = [
             self._get_bboxes_single(
-                rcnn_probs_list[i], rcnn_deltas_list[i], rois_list[i], pad_shapes[i])
+                rcnn_probs[i], rcnn_deltas[i], rois[i], pad_shapes[i])
             for i in range(img_metas.shape[0])
         ]
-        return detections_list  
+        return detections_list
     
     def _get_bboxes_single(self, rcnn_probs, rcnn_deltas, rois, img_shape):
         '''

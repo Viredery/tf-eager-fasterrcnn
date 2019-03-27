@@ -82,54 +82,54 @@ def rpn_bbox_loss(target_deltas, target_matchs, rpn_deltas):
 
 
 
-def rcnn_class_loss(target_matchs_list, rcnn_class_logits_list):
+def rcnn_class_loss(target_matchs, rcnn_class_logits):
     '''Loss for the classifier head of Faster RCNN.
     
     Args
     ---
-        target_matchs_list: list of [num_rois]. Integer class IDs. Uses zero
+        target_matchs:[batch_size * num_rois]. Integer class IDs. Uses zero
             padding to fill in the array.
-        rcnn_class_logits_list: list of [num_rois, num_classes]
+        rcnn_class_logits:[batch_size * num_rois, num_classes]
     '''
     
-    class_ids = tf.concat(target_matchs_list, 0)
-    class_logits = tf.concat(rcnn_class_logits_list, 0)
-    class_ids = tf.cast(class_ids, 'int64')
+    class_ids = tf.cast(target_matchs, 'int64')
+    
+    indices = tf.where(tf.not_equal(target_matchs, -1))
+    class_ids = tf.gather(class_ids, indices)
+    rcnn_class_logits = tf.gather_nd(rcnn_class_logits, indices)
     
     loss = tf.losses.sparse_softmax_cross_entropy(labels=class_ids,
-                                                  logits=class_logits)
+                                                  logits=rcnn_class_logits)
 
 
     loss = tf.reduce_mean(loss) if tf.size(loss) > 0 else tf.constant(0.0)
     return loss
 
 
-def rcnn_bbox_loss(target_deltas_list, target_matchs_list, rcnn_deltas_list):
+def rcnn_bbox_loss(target_deltas, target_matchs, rcnn_deltas):
     '''Loss for Faster R-CNN bounding box refinement.
     
     Args
     ---
-        target_deltas_list: list of [num_positive_rois, (dy, dx, log(dh), log(dw))]
-        target_matchs_list: list of [num_rois]. Integer class IDs.
-        rcnn_deltas_list: list of [num_rois, num_classes, (dy, dx, log(dh), log(dw))]
+        target_deltas: [batch_size * num_rois, (dy, dx, log(dh), log(dw))]
+        target_matchs: [batch_size * num_rois]. Integer class IDs.
+        rcnn_deltas: [batch_size * num_rois, num_classes, (dy, dx, log(dh), log(dw))]
     '''
     
-    target_deltas = tf.concat(target_deltas_list, 0)
-    target_class_ids = tf.concat(target_matchs_list, 0)
-    rcnn_deltas = tf.concat(rcnn_deltas_list, 0)
-
     # Only positive ROIs contribute to the loss. And only
     # the right class_id of each ROI. Get their indicies.
-    positive_roi_ix = tf.where(target_class_ids > 0)[:, 0]
+    positive_roi_ix = tf.where(target_matchs > 0)[:, 0]
     positive_roi_class_ids = tf.cast(
-        tf.gather(target_class_ids, positive_roi_ix), tf.int64)
+        tf.gather(target_matchs, positive_roi_ix), tf.int64)
     indices = tf.stack([positive_roi_ix, positive_roi_class_ids], axis=1)
     
     # Gather the deltas (predicted and true) that contribute to loss
+    target_deltas = tf.gather(target_deltas, positive_roi_ix)
     rcnn_deltas = tf.gather_nd(rcnn_deltas, indices)
-
+    
     # Smooth-L1 Loss
     loss = smooth_l1_loss(target_deltas, rcnn_deltas)
+    
     loss = tf.reduce_mean(loss) if tf.size(loss) > 0 else tf.constant(0.0)
-
+    
     return loss

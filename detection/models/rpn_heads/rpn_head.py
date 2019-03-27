@@ -147,13 +147,11 @@ class RPNHead(tf.keras.Model):
         
         Returns
         ---
-            proposals_list: list of [num_proposals, (y1, x1, y2, x2)] in 
+            proposals: [batch_size * num_proposals, (batch_ind, y1, x1, y2, x2))] in 
                 normalized coordinates if with_probs is False. 
                 Otherwise, the shape of proposals in proposals_list is 
-                [num_proposals, (y1, x1, y2, x2, score)]
+                [batch_size * num_proposals, (batch_ind, y1, x1, y2, x2, probs)]
         
-        Note that num_proposals is no more than proposal_count. And different 
-           images in one batch may have different num_proposals.
         '''
         anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
         
@@ -163,18 +161,19 @@ class RPNHead(tf.keras.Model):
         
         proposals_list = [
             self._get_proposals_single(
-                rpn_probs[i], rpn_deltas[i], anchors, valid_flags[i], pad_shapes[i], with_probs)
+                rpn_probs[i], rpn_deltas[i], anchors, valid_flags[i], pad_shapes[i], i, with_probs)
             for i in range(img_metas.shape[0])
         ]
         
-        return proposals_list
+        return tf.concat(proposals_list, axis=0)
     
     def _get_proposals_single(self, 
                               rpn_probs, 
                               rpn_deltas, 
                               anchors, 
                               valid_flags, 
-                              img_shape, 
+                              img_shape,
+                              batch_ind,
                               with_probs):
         '''Calculate proposals.
         
@@ -186,11 +185,12 @@ class RPNHead(tf.keras.Model):
                 pixel coordinates.
             valid_flags: [num_anchors]
             img_shape: np.ndarray. [2]. (img_height, img_width)
+            batch_ind: int.
             with_probs: bool.
         
         Returns
         ---
-            proposals: [num_proposals, (y1, x1, y2, x2)] in normalized 
+            proposals: [num_proposals, (batch_ind, y1, x1, y2, x2)] in normalized 
                 coordinates.
         '''
         
@@ -229,7 +229,14 @@ class RPNHead(tf.keras.Model):
         if with_probs:
             proposal_probs = tf.expand_dims(tf.gather(rpn_probs, indices), axis=1)
             proposals = tf.concat([proposals, proposal_probs], axis=1)
-   
+
+        # Pad
+        padding = tf.maximum(self.proposal_count - tf.shape(proposals)[0], 0)
+        proposals = tf.pad(proposals, [(0, padding), (0, 0)])
+        
+        batch_inds = tf.ones((proposals.shape[0], 1)) * batch_ind
+        proposals = tf.concat([batch_inds, proposals], axis=1)
+        
         return proposals
         
         
