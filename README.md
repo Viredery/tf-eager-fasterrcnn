@@ -11,7 +11,7 @@ Faster R-CNN R-101-FPN model was implemented with tensorflow eager execution.
 
 # Usage
 
-see `train_model.ipynb` and `inspect_model.ipynb`
+see `train_model.ipynb`, `inspect_model.ipynb` and `eval_model.ipynb`
 
 ### Download trained Faster R-CNN
 
@@ -20,13 +20,11 @@ see `train_model.ipynb` and `inspect_model.ipynb`
 
 # Updating
 
-- [ ] evaluation utils
-- [x] training without for-loop when batch size > 1
-- [ ] TTA (multi-scale testing, flip and box voting)
+- [ ] multi-GPU training
 - [ ] online hard examples mining
-- [ ] multi-scale training
 - [ ] soft-nms
-- [ ] balanced sampling and negative samples training (maybe)
+- [ ] TTA (multi-scale testing, flip and box voting)
+- [ ] multi-scale training
 
 
 # Acknowledgement
