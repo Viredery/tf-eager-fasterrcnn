@@ -50,8 +50,8 @@ class FasterRCNN(tf.keras.Model, RPNTestMixin, BBoxTestMixin):
         self.RCNN_NEG_IOU_THR = 0.5
         
         # Boxes kept configuration
-        self.RCNN_MIN_CONFIDENCE = 0.7
-        self.RCNN_NME_THRESHOLD = 0.3
+        self.RCNN_MIN_CONFIDENCE = 0.05
+        self.RCNN_NMS_THRESHOLD = 0.5
         self.RCNN_MAX_INSTANCES = 100
         
         # Target Generator for the second stage.
@@ -95,7 +95,7 @@ class FasterRCNN(tf.keras.Model, RPNTestMixin, BBoxTestMixin):
             target_means=self.RCNN_TARGET_MEANS,
             target_stds=self.RCNN_TARGET_STDS,
             min_confidence=self.RCNN_MIN_CONFIDENCE,
-            nms_threshold=self.RCNN_NME_THRESHOLD,
+            nms_threshold=self.RCNN_NMS_THRESHOLD,
             max_instances=self.RCNN_MAX_INSTANCES,
             name='b_box_head')
 

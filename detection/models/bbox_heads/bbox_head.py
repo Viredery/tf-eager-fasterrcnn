@@ -10,8 +10,8 @@ class BBoxHead(tf.keras.Model):
                  pool_size=(7, 7),
                  target_means=(0., 0., 0., 0.), 
                  target_stds=(0.1, 0.1, 0.2, 0.2),
-                 min_confidence=0.7,
-                 nms_threshold=0.3,
+                 min_confidence=0.05,
+                 nms_threshold=0.5,
                  max_instances=100,
                  **kwags):
         super(BBoxHead, self).__init__(**kwags)
