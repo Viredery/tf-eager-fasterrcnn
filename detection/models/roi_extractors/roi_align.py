@@ -50,7 +50,8 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         # the fact that our coordinates are normalized here.
         # e.g. a 224x224 ROI (in pixels) maps to P4
 
-        roi_level = tf.log(tf.sqrt(tf.squeeze(h * w, 1)) / tf.cast((224.0 / tf.sqrt(areas * 1.0)), tf.float32)) / tf.log(2.0)
+        roi_level = tf.math.log(
+            tf.sqrt(tf.squeeze(h * w, 1)) / tf.cast((224.0 / tf.sqrt(areas * 1.0)), tf.float32)) / tf.math.log(2.0)
         roi_level = tf.minimum(5, tf.maximum(
             2, 4 + tf.cast(tf.round(roi_level), tf.int32)))
 

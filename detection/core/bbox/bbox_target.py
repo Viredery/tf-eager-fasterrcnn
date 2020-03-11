@@ -112,13 +112,13 @@ class ProposalTarget(object):
         # Subsample ROIs. Aim for 33% positive
         # Positive ROIs
         positive_count = int(self.num_rcnn_deltas * self.positive_fraction)
-        positive_indices = tf.random_shuffle(positive_indices)[:positive_count]
+        positive_indices = tf.random.shuffle(positive_indices)[:positive_count]
         positive_count = tf.shape(positive_indices)[0]
         
         # Negative ROIs. Add enough to maintain positive:negative ratio.
         r = 1.0 / self.positive_fraction
         negative_count = tf.cast(r * tf.cast(positive_count, tf.float32), tf.int32) - positive_count
-        negative_indices = tf.random_shuffle(negative_indices)[:negative_count]
+        negative_indices = tf.random.shuffle(negative_indices)[:negative_count]
         
         # Gather selected ROIs
         positive_rois = tf.gather(proposals, positive_indices)

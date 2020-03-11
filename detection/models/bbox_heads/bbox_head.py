@@ -148,9 +148,9 @@ class BBoxHead(tf.keras.Model):
         # Filter out low confidence boxes
         if self.min_confidence:
             conf_keep = tf.where(class_scores >= self.min_confidence)[:, 0]
-            keep = tf.sets.set_intersection(tf.expand_dims(keep, 0),
-                                            tf.expand_dims(conf_keep, 0))
-            keep = tf.sparse_tensor_to_dense(keep)[0]
+            keep = tf.compat.v2.sets.intersection(tf.expand_dims(keep, 0),
+                                                  tf.expand_dims(conf_keep, 0))
+            keep = tf.sparse.to_dense(keep)[0]
             
         # Apply per-class NMS
         # 1. Prepare variables
@@ -183,9 +183,9 @@ class BBoxHead(tf.keras.Model):
             nms_keep = tf.zeros([0,], tf.int64)
         
         # 3. Compute intersection between keep and nms_keep
-        keep = tf.sets.set_intersection(tf.expand_dims(keep, 0),
-                                        tf.expand_dims(nms_keep, 0))
-        keep = tf.sparse_tensor_to_dense(keep)[0]
+        keep = tf.compat.v2.sets.intersection(tf.expand_dims(keep, 0),
+                                              tf.expand_dims(nms_keep, 0))
+        keep = tf.sparse.to_dense(keep)[0]
         # Keep top detections
         roi_count = self.max_instances
         class_scores_keep = tf.gather(class_scores, keep)
@@ -195,7 +195,7 @@ class BBoxHead(tf.keras.Model):
         
         detections = tf.concat([
             tf.gather(refined_rois, keep),
-            tf.to_float(tf.gather(class_ids, keep))[..., tf.newaxis],
+            tf.cast(tf.gather(class_ids, keep), tf.float32)[..., tf.newaxis],
             tf.gather(class_scores, keep)[..., tf.newaxis]
             ], axis=1)
         

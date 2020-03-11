@@ -38,11 +38,15 @@ class CocoDataSet(object):
             cat_id: i + 1
             for i, cat_id in enumerate(self.cat_ids)
         }
+        self.label2cat = {
+            i + 1: cat_id
+            for i, cat_id in enumerate(self.cat_ids)
+        }
         
         self.img_ids, self.img_infos = self._filter_imgs()
         
         if debug:
-            self.img_ids, self.img_infos = self.img_ids[:50], self.img_infos[:50]
+            self.img_ids, self.img_infos = self.img_ids[:5], self.img_infos[:5]
             
         self.image_dir = "{}/{}2017".format(dataset_dir, subset)
         

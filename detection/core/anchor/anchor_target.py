@@ -102,7 +102,7 @@ class AnchorTarget(object):
         # 1. Set negative anchors first. They get overwritten below if a GT box is
         # matched to them.
         anchor_iou_argmax = tf.argmax(overlaps, axis=1)
-        anchor_iou_max = tf.reduce_max(overlaps, reduction_indices=[1])
+        anchor_iou_max = tf.reduce_max(overlaps, axis=[1])
         
         target_matchs = tf.where(anchor_iou_max < self.neg_iou_thr, 
                                  -tf.ones(anchors.shape[0], dtype=tf.int32), target_matchs)
@@ -117,8 +117,7 @@ class AnchorTarget(object):
 
         # 3. Set an anchor for each GT box (regardless of IoU value).        
         gt_iou_argmax = tf.argmax(overlaps, axis=0)
-        target_matchs = tf.scatter_update(tf.Variable(target_matchs), gt_iou_argmax, 1)
-        
+        target_matchs = tf.compat.v1.scatter_update(tf.Variable(target_matchs), gt_iou_argmax, 1)        
         
         # Subsample to balance positive and negative anchors
         # Don't let positives be more than half the anchors
@@ -127,7 +126,7 @@ class AnchorTarget(object):
         extra = ids.shape.as_list()[0] - int(self.num_rpn_deltas * self.positive_fraction)
         if extra > 0:
             # Reset the extra ones to neutral
-            ids = tf.random_shuffle(ids)[:extra]
+            ids = tf.random.shuffle(ids)[:extra]
             target_matchs = tf.scatter_update(target_matchs, ids, 0)
         # Same for negative proposals
         ids = tf.where(tf.equal(target_matchs, -1))
@@ -136,9 +135,8 @@ class AnchorTarget(object):
             tf.reduce_sum(tf.cast(tf.equal(target_matchs, 1), tf.int32)))
         if extra > 0:
             # Rest the extra ones to neutral
-            ids = tf.random_shuffle(ids)[:extra]
-            target_matchs = tf.scatter_update(target_matchs, ids, 0)
-
+            ids = tf.random.shuffle(ids)[:extra]
+            target_matchs = tf.compat.v1.scatter_update(target_matchs, ids, 0)
         
         # For positive anchors, compute shift and scale needed to transform them
         # to match the corresponding GT boxes.
