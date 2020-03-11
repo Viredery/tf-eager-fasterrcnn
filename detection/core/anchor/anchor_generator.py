@@ -50,9 +50,6 @@ class AnchorGenerator(object):
         ]
         valid_flags = tf.stack(valid_flags, axis=0)
         
-        anchors = tf.stop_gradient(anchors)
-        valid_flags = tf.stop_gradient(valid_flags)
-        
         return anchors, valid_flags
     
     def _generate_valid_flags(self, anchors, img_shape):

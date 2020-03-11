@@ -61,9 +61,6 @@ class AnchorTarget(object):
         rpn_target_matchs = tf.stack(rpn_target_matchs)
         rpn_target_deltas = tf.stack(rpn_target_deltas)
         
-        rpn_target_matchs = tf.stop_gradient(rpn_target_matchs)
-        rpn_target_deltas = tf.stop_gradient(rpn_target_deltas)
-        
         return rpn_target_matchs, rpn_target_deltas
 
     def _build_single_target(self, anchors, valid_flags, gt_boxes, gt_class_ids):
@@ -117,7 +114,9 @@ class AnchorTarget(object):
 
         # 3. Set an anchor for each GT box (regardless of IoU value).        
         gt_iou_argmax = tf.argmax(overlaps, axis=0)
-        target_matchs = tf.compat.v1.scatter_update(tf.Variable(target_matchs), gt_iou_argmax, 1)        
+        target_matchs = tf.tensor_scatter_nd_update(target_matchs, 
+                                                    tf.reshape(gt_iou_argmax, (-1, 1)), 
+                                                    tf.ones(gt_iou_argmax.shape, dtype=tf.int32))
         
         # Subsample to balance positive and negative anchors
         # Don't let positives be more than half the anchors
@@ -127,7 +126,9 @@ class AnchorTarget(object):
         if extra > 0:
             # Reset the extra ones to neutral
             ids = tf.random.shuffle(ids)[:extra]
-            target_matchs = tf.scatter_update(target_matchs, ids, 0)
+            target_matchs = tf.tensor_scatter_nd_update(target_matchs, 
+                                                        tf.reshape(ids, (-1, 1)), 
+                                                        tf.zeros(ids.shape, dtype=tf.int32))
         # Same for negative proposals
         ids = tf.where(tf.equal(target_matchs, -1))
         ids = tf.squeeze(ids, 1)
@@ -136,7 +137,9 @@ class AnchorTarget(object):
         if extra > 0:
             # Rest the extra ones to neutral
             ids = tf.random.shuffle(ids)[:extra]
-            target_matchs = tf.compat.v1.scatter_update(target_matchs, ids, 0)
+            target_matchs = tf.tensor_scatter_nd_update(target_matchs, 
+                                                        tf.reshape(ids, (-1, 1)), 
+                                                        tf.zeros(ids.shape, dtype=tf.int32))
         
         # For positive anchors, compute shift and scale needed to transform them
         # to match the corresponding GT boxes.

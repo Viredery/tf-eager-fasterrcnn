@@ -165,7 +165,8 @@ class RPNHead(tf.keras.Model):
             for i in range(img_metas.shape[0])
         ]
         
-        return tf.concat(proposals_list, axis=0)
+        proposals = tf.concat(proposals_list, axis=0)
+        return tf.stop_gradient(proposals)
     
     def _get_proposals_single(self, 
                               rpn_probs, 

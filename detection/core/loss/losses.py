@@ -33,8 +33,9 @@ def rpn_class_loss(target_matchs, rpn_class_logits):
     rpn_class_logits = tf.gather_nd(rpn_class_logits, indices)
     anchor_class = tf.gather_nd(anchor_class, indices)
     # Cross entropy loss
-    loss = tf.compat.v1.losses.sparse_softmax_cross_entropy(labels=anchor_class,
-                                                  logits=rpn_class_logits)
+    loss = tf.keras.losses.sparse_categorical_crossentropy(y_true=anchor_class,
+                                                           y_pred=rpn_class_logits,
+                                                           from_logits=True)
     
     loss = tf.reduce_mean(loss) if tf.size(loss) > 0 else tf.constant(0.0)
     return loss
@@ -98,9 +99,10 @@ def rcnn_class_loss(target_matchs, rcnn_class_logits):
     class_ids = tf.gather(class_ids, indices)
     rcnn_class_logits = tf.gather_nd(rcnn_class_logits, indices)
     
-    loss = tf.compat.v1.losses.sparse_softmax_cross_entropy(labels=class_ids,
-                                                  logits=rcnn_class_logits)
-
+    loss = tf.keras.losses.sparse_categorical_crossentropy(y_true=class_ids,
+                                                           y_pred=rcnn_class_logits,
+                                                           from_logits=True)
+    
     loss = tf.reduce_mean(loss) if tf.size(loss) > 0 else tf.constant(0.0)
     return loss
 

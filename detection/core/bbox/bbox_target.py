@@ -63,14 +63,9 @@ class ProposalTarget(object):
             rcnn_target_matchs_list.append(target_matchs)
             rcnn_target_deltas_list.append(target_deltas)
 
-
         rois = tf.concat(rois_list, axis=0)
         target_matchs = tf.concat(rcnn_target_matchs_list, axis=0)
         target_deltas = tf.concat(rcnn_target_deltas_list, axis=0)
-        
-        rois = tf.stop_gradient(rois)
-        target_matchs = tf.stop_gradient(target_matchs)
-        target_deltas = tf.stop_gradient(target_deltas)
         
         return rois, target_matchs, target_deltas
     
