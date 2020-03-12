@@ -24,8 +24,9 @@ class BBoxHead(tf.keras.Model):
         self.nms_threshold = nms_threshold
         self.max_instances = max_instances
         
-        self.rcnn_class_loss = losses.rcnn_class_loss
-        self.rcnn_bbox_loss = losses.rcnn_bbox_loss
+        self.rcnn_class_loss = losses.RCNNClassLoss()
+#         self.rcnn_class_loss = losses.rcnn_class_loss
+        self.rcnn_bbox_loss = losses.RCNNBBoxLoss()
         
         self.rcnn_class_conv1 = layers.Conv2D(1024, self.pool_size, 
                                               padding='valid', name='rcnn_class_conv1')
@@ -75,13 +76,15 @@ class BBoxHead(tf.keras.Model):
 
     def loss(self, 
              rcnn_class_logits, rcnn_deltas, 
-             rcnn_target_matchs, rcnn_target_deltas):
+             rcnn_labels, rcnn_label_weights, rcnn_delta_targets, rcnn_delta_weights):
         '''Calculate RCNN loss
         '''
         rcnn_class_loss = self.rcnn_class_loss(
-            rcnn_target_matchs, rcnn_class_logits)
+            rcnn_labels, rcnn_class_logits, rcnn_label_weights)
+#         rcnn_class_loss = self.rcnn_class_loss(
+#             rcnn_labels, rcnn_class_logits)
         rcnn_bbox_loss = self.rcnn_bbox_loss(
-            rcnn_target_deltas, rcnn_target_matchs, rcnn_deltas)
+            rcnn_delta_targets, rcnn_deltas, rcnn_delta_weights)
         
         return rcnn_class_loss, rcnn_bbox_loss
         

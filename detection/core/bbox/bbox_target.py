@@ -11,7 +11,8 @@ class ProposalTarget(object):
                  num_rcnn_deltas=256,
                  positive_fraction=0.25,
                  pos_iou_thr=0.5,
-                 neg_iou_thr=0.5):
+                 neg_iou_thr=0.5,
+                 num_classes=81):
         '''Compute regression and classification targets for proposals.
         
         Attributes
@@ -27,6 +28,7 @@ class ProposalTarget(object):
         self.positive_fraction = positive_fraction
         self.pos_iou_thr = pos_iou_thr
         self.neg_iou_thr = neg_iou_thr
+        self.num_classes = num_classes
             
     def build_targets(self, proposals, gt_boxes, gt_class_ids, img_metas):
         '''Generates detection targets for images. Subsamples proposals and
@@ -52,22 +54,29 @@ class ProposalTarget(object):
         
         proposals = tf.reshape(proposals[:, :5], (batch_size, -1, 5))
         
-        rois_list = []
-        rcnn_target_matchs_list = []
-        rcnn_target_deltas_list = []
+        rcnn_rois = []
+        rcnn_labels = []
+        rcnn_label_weights = []
+        rcnn_delta_targets = []
+        rcnn_delta_weights = []
+
         
         for i in range(batch_size):
-            rois, target_matchs, target_deltas = self._build_single_target(
+            rois, labels, label_weights, delta_targets, delta_weights = self._build_single_target(
                 proposals[i], gt_boxes[i], gt_class_ids[i], pad_shapes[i], i)
-            rois_list.append(rois)
-            rcnn_target_matchs_list.append(target_matchs)
-            rcnn_target_deltas_list.append(target_deltas)
+            rcnn_rois.append(rois)
+            rcnn_labels.append(labels)
+            rcnn_label_weights.append(label_weights)
+            rcnn_delta_targets.append(delta_targets)
+            rcnn_delta_weights.append(delta_weights)
 
-        rois = tf.concat(rois_list, axis=0)
-        target_matchs = tf.concat(rcnn_target_matchs_list, axis=0)
-        target_deltas = tf.concat(rcnn_target_deltas_list, axis=0)
+        rcnn_rois = tf.concat(rcnn_rois, axis=0)
+        rcnn_labels = tf.concat(rcnn_labels, axis=0)
+        rcnn_label_weights = tf.concat(rcnn_label_weights, axis=0)
+        rcnn_delta_targets = tf.concat(rcnn_delta_targets, axis=0)
+        rcnn_delta_weights = tf.concat(rcnn_delta_weights, axis=0)
         
-        return rois, target_matchs, target_deltas
+        return rcnn_rois, rcnn_labels, rcnn_label_weights, rcnn_delta_targets, rcnn_delta_weights
     
     def _build_single_target(self, proposals, gt_boxes, gt_class_ids, img_shape, batch_ind):
         '''
@@ -123,21 +132,48 @@ class ProposalTarget(object):
         positive_overlaps = tf.gather(overlaps, positive_indices)
         roi_gt_box_assignment = tf.argmax(positive_overlaps, axis=1)
         roi_gt_boxes = tf.gather(gt_boxes, roi_gt_box_assignment)
-        target_matchs = tf.gather(gt_class_ids, roi_gt_box_assignment)
+        labels = tf.gather(gt_class_ids, roi_gt_box_assignment)
         
         
-        target_deltas = transforms.bbox2delta(positive_rois[:, 1:], roi_gt_boxes, self.target_means, self.target_stds)
+        delta_targets = transforms.bbox2delta(positive_rois[:, 1:], roi_gt_boxes, self.target_means, self.target_stds)
         
         rois = tf.concat([positive_rois, negative_rois], axis=0)
         
         
         N = tf.shape(negative_rois)[0]
         P = tf.maximum(self.num_rcnn_deltas - tf.shape(rois)[0], 0)
+        num_bfg = rois.shape[0]
         
         rois = tf.pad(rois, [(0, P), (0, 0)])
+        labels = tf.pad(labels, [(0, N)], constant_values=0)
+        labels = tf.pad(labels, [(0, P)], constant_values=0)
+        delta_targets = tf.pad(delta_targets, [(0, N + P), (0, 0)])
         
-        target_matchs = tf.pad(target_matchs, [(0, N)])
-        target_matchs = tf.pad(target_matchs, [(0, P)], constant_values=-1)
-        target_deltas = tf.pad(target_deltas, [(0, N + P), (0, 0)])
+        
+        # Compute weights
+        if num_bfg > 0:
+            label_weights = tf.concat([tf.ones((num_bfg,), dtype=tf.float32) / num_bfg, 
+                                       tf.zeros((P,), dtype=tf.float32)], 
+                                      axis=0)
+            delta_weights = tf.concat([tf.ones((num_bfg - N,), dtype=tf.float32) / num_bfg, 
+                                       tf.zeros((N + P,), dtype=tf.float32)], 
+                                      axis=0)
+        else:
+            label_weights = tf.zeros((labels.shape[0],), dtype=tf.float32)
+            delta_weights = tf.zeros((delta_targets.shape[0],), dtype=tf.float32)
 
-        return rois, target_matchs, target_deltas
+        delta_weights = tf.tile(tf.reshape(delta_weights, (-1, 1)), [1, 4])
+        
+        new_delta_targets = tf.zeros((labels.shape[0], self.num_classes, 4))
+        new_delta_weights = tf.zeros((labels.shape[0], self.num_classes, 4))
+
+        ids = tf.stack([tf.range(self.num_rcnn_deltas, dtype=tf.int64), labels], axis=1)
+        delta_targets = tf.tensor_scatter_nd_update(new_delta_targets,
+                                                    ids,
+                                                    delta_targets)
+        
+        delta_weights = tf.tensor_scatter_nd_update(new_delta_weights,
+                                                    ids,
+                                                    delta_weights)
+        
+        return rois, labels, label_weights, delta_targets, delta_weights

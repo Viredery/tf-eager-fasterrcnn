@@ -44,24 +44,29 @@ class AnchorTarget(object):
         Returns
         ---
             rpn_target_matchs: [batch_size, num_anchors] matches between anchors and GT boxes.
-                1 = positive anchor, -1 = negative anchor, 0 = neutral anchor
             rpn_target_deltas: [batch_size, num_rpn_deltas, (dy, dx, log(dh), log(dw))] 
                 Anchor bbox deltas.
         '''
-        rpn_target_matchs = []
-        rpn_target_deltas = []
+        rpn_labels = []
+        rpn_label_weights = []
+        rpn_delta_targets = []
+        rpn_delta_weights = []
         
         num_imgs = gt_class_ids.shape[0]
         for i in range(num_imgs):
-            target_match, target_delta = self._build_single_target(
+            labels, label_weights, delta_targets, delta_weights = self._build_single_target(
                 anchors, valid_flags[i], gt_boxes[i], gt_class_ids[i])
-            rpn_target_matchs.append(target_match)
-            rpn_target_deltas.append(target_delta)
+            rpn_labels.append(labels)
+            rpn_label_weights.append(label_weights)
+            rpn_delta_targets.append(delta_targets)
+            rpn_delta_weights.append(delta_weights)
         
-        rpn_target_matchs = tf.stack(rpn_target_matchs)
-        rpn_target_deltas = tf.stack(rpn_target_deltas)
+        rpn_labels = tf.stack(rpn_labels)
+        rpn_label_weights = tf.stack(rpn_label_weights)
+        rpn_delta_targets = tf.stack(rpn_delta_targets)
+        rpn_delta_weights = tf.stack(rpn_delta_weights)
         
-        return rpn_target_matchs, rpn_target_deltas
+        return rpn_labels, rpn_label_weights, rpn_delta_targets, rpn_delta_weights
 
     def _build_single_target(self, anchors, valid_flags, gt_boxes, gt_class_ids):
         '''Compute targets per instance.
@@ -80,7 +85,7 @@ class AnchorTarget(object):
         '''
         gt_boxes, _ = trim_zeros(gt_boxes)
         
-        target_matchs = tf.zeros(anchors.shape[0], dtype=tf.int32)
+        labels = -tf.ones(anchors.shape[0], dtype=tf.int32)
         
         # Compute overlaps [num_anchors, num_gt_boxes]
         overlaps = geometry.compute_overlaps(anchors, gt_boxes)
@@ -93,66 +98,73 @@ class AnchorTarget(object):
         # However, don't keep any GT box unmatched (rare, but happens). Instead,
         # match it to the closest anchor (even if its max IoU is < 0.3).
         
-        neg_values = tf.constant([0, -1])
-        pos_values = tf.constant([0, 1])
         
         # 1. Set negative anchors first. They get overwritten below if a GT box is
         # matched to them.
         anchor_iou_argmax = tf.argmax(overlaps, axis=1)
         anchor_iou_max = tf.reduce_max(overlaps, axis=[1])
         
-        target_matchs = tf.where(anchor_iou_max < self.neg_iou_thr, 
-                                 -tf.ones(anchors.shape[0], dtype=tf.int32), target_matchs)
+        labels = tf.where(anchor_iou_max < self.neg_iou_thr, 
+                          tf.zeros(anchors.shape[0], dtype=tf.int32), labels)
 
         # filter invalid anchors
-        target_matchs = tf.where(tf.equal(valid_flags, 1), 
-                                 target_matchs, tf.zeros(anchors.shape[0], dtype=tf.int32))
+        labels = tf.where(tf.equal(valid_flags, 1), 
+                          labels, -tf.ones(anchors.shape[0], dtype=tf.int32))
 
         # 2. Set anchors with high overlap as positive.
-        target_matchs = tf.where(anchor_iou_max >= self.pos_iou_thr, 
-                                 tf.ones(anchors.shape[0], dtype=tf.int32), target_matchs)
+        labels = tf.where(anchor_iou_max >= self.pos_iou_thr, 
+                          tf.ones(anchors.shape[0], dtype=tf.int32), labels)
 
         # 3. Set an anchor for each GT box (regardless of IoU value).        
         gt_iou_argmax = tf.argmax(overlaps, axis=0)
-        target_matchs = tf.tensor_scatter_nd_update(target_matchs, 
-                                                    tf.reshape(gt_iou_argmax, (-1, 1)), 
-                                                    tf.ones(gt_iou_argmax.shape, dtype=tf.int32))
+        labels = tf.tensor_scatter_nd_update(labels, 
+                                             tf.reshape(gt_iou_argmax, (-1, 1)), 
+                                             tf.ones(gt_iou_argmax.shape, dtype=tf.int32))
         
         # Subsample to balance positive and negative anchors
         # Don't let positives be more than half the anchors
-        ids = tf.where(tf.equal(target_matchs, 1))
-        ids = tf.squeeze(ids, 1)
+        ids = tf.where(tf.equal(labels, 1))
         extra = ids.shape.as_list()[0] - int(self.num_rpn_deltas * self.positive_fraction)
         if extra > 0:
             # Reset the extra ones to neutral
             ids = tf.random.shuffle(ids)[:extra]
-            target_matchs = tf.tensor_scatter_nd_update(target_matchs, 
-                                                        tf.reshape(ids, (-1, 1)), 
-                                                        tf.zeros(ids.shape, dtype=tf.int32))
+            labels = tf.tensor_scatter_nd_update(labels, 
+                                                 ids, 
+                                                 -tf.ones(ids.shape[0], dtype=tf.int32))
         # Same for negative proposals
-        ids = tf.where(tf.equal(target_matchs, -1))
-        ids = tf.squeeze(ids, 1)
+        ids = tf.where(tf.equal(labels, 0))
         extra = ids.shape.as_list()[0] - (self.num_rpn_deltas -
-            tf.reduce_sum(tf.cast(tf.equal(target_matchs, 1), tf.int32)))
+            tf.reduce_sum(tf.cast(tf.equal(labels, 1), tf.int32)))
         if extra > 0:
             # Rest the extra ones to neutral
             ids = tf.random.shuffle(ids)[:extra]
-            target_matchs = tf.tensor_scatter_nd_update(target_matchs, 
-                                                        tf.reshape(ids, (-1, 1)), 
-                                                        tf.zeros(ids.shape, dtype=tf.int32))
+            labels = tf.tensor_scatter_nd_update(labels, 
+                                                 ids, 
+                                                 -tf.ones(ids.shape[0], dtype=tf.int32))
         
         # For positive anchors, compute shift and scale needed to transform them
         # to match the corresponding GT boxes.
-        ids = tf.where(tf.equal(target_matchs, 1))
-        
-        a = tf.gather_nd(anchors, ids)
-        anchor_idx = tf.gather_nd(anchor_iou_argmax, ids)
-        gt = tf.gather(gt_boxes, anchor_idx)
-        
-        target_deltas = transforms.bbox2delta(
-            a, gt, self.target_means, self.target_stds)
-        
-        padding = tf.maximum(self.num_rpn_deltas - tf.shape(target_deltas)[0], 0)
-        target_deltas = tf.pad(target_deltas, [(0, padding), (0, 0)])
 
-        return target_matchs, target_deltas
+        # Compute box deltas
+        gt = tf.gather(gt_boxes, anchor_iou_argmax)
+        delta_targets = transforms.bbox2delta(anchors, gt, self.target_means, self.target_stds)
+
+        # Compute weights
+        label_weights = tf.zeros((anchors.shape[0],), dtype=tf.float32)
+        delta_weights = tf.zeros((anchors.shape[0],), dtype=tf.float32)
+        num_bfg = tf.where(tf.greater_equal(labels, 0)).shape[0]
+        if num_bfg > 0:
+            label_weights = tf.where(labels >= 0, 
+                                     tf.ones(label_weights.shape, dtype=tf.float32) / num_bfg, 
+                                     label_weights)
+
+            delta_weights = tf.where(labels > 0, 
+                                     tf.ones(delta_weights.shape, dtype=tf.float32) / num_bfg, 
+                                     delta_weights)
+        delta_weights = tf.tile(tf.reshape(delta_weights, (-1, 1)), [1, 4])
+        
+        # Update Labels
+        labels = tf.where(labels >= 0, 
+                          labels, tf.zeros(labels.shape[0], dtype=tf.int32))
+     
+        return labels, label_weights, delta_targets, delta_weights

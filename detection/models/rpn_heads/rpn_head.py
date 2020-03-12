@@ -64,8 +64,8 @@ class RPNHead(tf.keras.Model):
             pos_iou_thr=pos_iou_thr,
             neg_iou_thr=neg_iou_thr)
         
-        self.rpn_class_loss = losses.rpn_class_loss
-        self.rpn_bbox_loss = losses.rpn_bbox_loss
+        self.rpn_class_loss = losses.RPNClassLoss()
+        self.rpn_bbox_loss = losses.RPNBBoxLoss()
         
         
         # Shared convolutional base of the RPN
@@ -121,13 +121,13 @@ class RPNHead(tf.keras.Model):
         '''
         anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
         
-        rpn_target_matchs, rpn_target_deltas = self.anchor_target.build_targets(
-            anchors, valid_flags, gt_boxes, gt_class_ids)
+        rpn_labels, rpn_label_weights, rpn_delta_targets, rpn_delta_weights = \
+            self.anchor_target.build_targets(anchors, valid_flags, gt_boxes, gt_class_ids)
         
         rpn_class_loss = self.rpn_class_loss(
-            rpn_target_matchs, rpn_class_logits)
+            rpn_labels, rpn_class_logits, rpn_label_weights)
         rpn_bbox_loss = self.rpn_bbox_loss(
-            rpn_target_deltas, rpn_target_matchs, rpn_deltas)
+            rpn_delta_targets, rpn_deltas, rpn_delta_weights)
         
         return rpn_class_loss, rpn_bbox_loss
     

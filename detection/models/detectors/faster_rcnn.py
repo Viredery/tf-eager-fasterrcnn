@@ -61,7 +61,8 @@ class FasterRCNN(tf.keras.Model, RPNTestMixin, BBoxTestMixin):
             num_rcnn_deltas=self.RCNN_BATCH_SIZE,
             positive_fraction=self.RCNN_POS_FRAC,
             pos_iou_thr=self.RCNN_POS_IOU_THR,
-            neg_iou_thr=self.RCNN_NEG_IOU_THR)
+            neg_iou_thr=self.RCNN_NEG_IOU_THR,
+            num_classes=self.NUM_CLASSES)
                 
         # Modules
         self.backbone = resnet.ResNet(
@@ -121,7 +122,7 @@ class FasterRCNN(tf.keras.Model, RPNTestMixin, BBoxTestMixin):
             rpn_probs, rpn_deltas, img_metas)
         
         if training:
-            rois, rcnn_target_matchs, rcnn_target_deltas = \
+            rois, rcnn_labels, rcnn_label_weights, rcnn_delta_targets, rcnn_delta_weights = \
                 self.bbox_target.build_targets(
                     proposals, gt_boxes, gt_class_ids, img_metas)
         else:
@@ -136,11 +137,12 @@ class FasterRCNN(tf.keras.Model, RPNTestMixin, BBoxTestMixin):
             
         if training:
             rpn_class_loss, rpn_bbox_loss = self.rpn_head.loss(
-                rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids, img_metas)
+                rpn_class_logits, rpn_deltas, 
+                gt_boxes, gt_class_ids, img_metas)
             
             rcnn_class_loss, rcnn_bbox_loss = self.bbox_head.loss(
                 rcnn_class_logits, rcnn_deltas, 
-                rcnn_target_matchs, rcnn_target_deltas)
+                rcnn_labels, rcnn_label_weights, rcnn_delta_targets, rcnn_delta_weights)
             
             return [rpn_class_loss, rpn_bbox_loss, 
                     rcnn_class_loss, rcnn_bbox_loss]
