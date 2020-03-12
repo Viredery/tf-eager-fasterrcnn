@@ -43,9 +43,12 @@ class AnchorTarget(object):
 
         Returns
         ---
-            rpn_target_matchs: [batch_size, num_anchors] matches between anchors and GT boxes.
-            rpn_target_deltas: [batch_size, num_rpn_deltas, (dy, dx, log(dh), log(dw))] 
+            rpn_labels: [batch_size, num_anchors] 
+                Matches between anchors and GT boxes. 1 - positive samples; 0 - negative samples; -1 - neglect
+            rpn_label_weights: [batch_size, num_anchors] 
+            rpn_delta_targets: [batch_size, num_anchors, (dy, dx, log(dh), log(dw))] 
                 Anchor bbox deltas.
+            rpn_delta_weights: [batch_size, num_anchors, 4]
         '''
         rpn_labels = []
         rpn_label_weights = []
@@ -80,8 +83,10 @@ class AnchorTarget(object):
         
         Returns
         ---
-            target_matchs: [num_anchors]
-            target_deltas: [num_rpn_deltas, (dy, dx, log(dh), log(dw))] 
+            labels: [num_anchors]
+            label_weights: [num_anchors]
+            delta_targets: [num_anchors, (dy, dx, log(dh), log(dw))] 
+            delta_weights: [num_anchors, 4]
         '''
         gt_boxes, _ = trim_zeros(gt_boxes)
         
@@ -107,7 +112,7 @@ class AnchorTarget(object):
         labels = tf.where(anchor_iou_max < self.neg_iou_thr, 
                           tf.zeros(anchors.shape[0], dtype=tf.int32), labels)
 
-        # filter invalid anchors
+        # Filter invalid anchors
         labels = tf.where(tf.equal(valid_flags, 1), 
                           labels, -tf.ones(anchors.shape[0], dtype=tf.int32))
 
@@ -163,8 +168,4 @@ class AnchorTarget(object):
                                      delta_weights)
         delta_weights = tf.tile(tf.reshape(delta_weights, (-1, 1)), [1, 4])
         
-        # Update Labels
-        labels = tf.where(labels >= 0, 
-                          labels, tf.zeros(labels.shape[0], dtype=tf.int32))
-     
         return labels, label_weights, delta_targets, delta_weights

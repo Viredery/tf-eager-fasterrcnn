@@ -20,6 +20,10 @@ class ProposalTarget(object):
             target_means: [4]. Bounding box refinement mean for RCNN.
             target_stds: [4]. Bounding box refinement standard deviation for RCNN.
             num_rcnn_deltas: int. Maximal number of RoIs per image to feed to bbox heads.
+            positive_fraction: float.
+            pos_iou_thr: float.
+            neg_iou_thr: float.
+            num_classes: int.
 
         '''
         self.target_means = target_means
@@ -43,9 +47,13 @@ class ProposalTarget(object):
             
         Returns
         ---
-            rois: [batch_size * num_rois, (batch_ind, y1, x1, y2, x2)] in normalized coordinates
-            rcnn_target_matchs: [batch_size * num_rois]. Integer class IDs.
-            rcnn_target_deltas: [batch_size * num_rois, (dy, dx, log(dh), log(dw))].
+            rcnn_rois: [batch_size * num_rois, (batch_ind, y1, x1, y2, x2)] in normalized coordinates
+            rcnn_labels: [batch_size * num_rois].
+                Integer class IDs.
+            rcnn_label_weights: [batch_size * num_rois].
+            rcnn_delta_targets: [batch_size * num_rois, num_classes, (dy, dx, log(dh), log(dw))].
+                ROI bbox deltas.
+            rcnn_delta_weights: [batch_size * num_rois, num_classes, 4].
             
         '''
         
@@ -59,7 +67,6 @@ class ProposalTarget(object):
         rcnn_label_weights = []
         rcnn_delta_targets = []
         rcnn_delta_weights = []
-
         
         for i in range(batch_size):
             rois, labels, label_weights, delta_targets, delta_weights = self._build_single_target(
@@ -91,14 +98,14 @@ class ProposalTarget(object):
         Returns
         ---
             rois: [num_rois, (batch_ind, y1, x1, y2, x2)]
-            target_matchs: [num_rois]
-            target_deltas: [num_rois, (dy, dx, log(dh), log(dw))]
+            labels: [num_rois]
+            label_weights: [num_rois]
+            target_deltas: [num_rois, num_classes, (dy, dx, log(dh), log(dw))]
+            delta_weights: [num_rois, num_classes, 4]
         '''
         H, W = img_shape
         
-        
         trimmed_proposals, _ = trim_zeros(proposals[:, 1:])
-        
         gt_boxes, non_zeros = trim_zeros(gt_boxes)
         gt_class_ids = tf.boolean_mask(gt_class_ids, non_zeros)
         
@@ -125,8 +132,8 @@ class ProposalTarget(object):
         negative_indices = tf.random.shuffle(negative_indices)[:negative_count]
         
         # Gather selected ROIs
-        positive_rois = tf.gather(proposals, positive_indices)
-        negative_rois = tf.gather(proposals, negative_indices)
+        positive_rois = tf.gather(proposals, positive_indices) # [num_positive_rois, 5]
+        negative_rois = tf.gather(proposals, negative_indices) # [num_negative_rois, 5]
 
         # Assign positive ROIs to GT boxes.
         positive_overlaps = tf.gather(overlaps, positive_indices)
@@ -135,7 +142,8 @@ class ProposalTarget(object):
         labels = tf.gather(gt_class_ids, roi_gt_box_assignment)
         
         
-        delta_targets = transforms.bbox2delta(positive_rois[:, 1:], roi_gt_boxes, self.target_means, self.target_stds)
+        delta_targets = transforms.bbox2delta(
+            positive_rois[:, 1:], roi_gt_boxes, self.target_means, self.target_stds)
         
         rois = tf.concat([positive_rois, negative_rois], axis=0)
         
@@ -144,36 +152,31 @@ class ProposalTarget(object):
         P = tf.maximum(self.num_rcnn_deltas - tf.shape(rois)[0], 0)
         num_bfg = rois.shape[0]
         
-        rois = tf.pad(rois, [(0, P), (0, 0)])
+        rois = tf.pad(rois, [(0, P), (0, 0)]) # [num_rois, 5]
         labels = tf.pad(labels, [(0, N)], constant_values=0)
-        labels = tf.pad(labels, [(0, P)], constant_values=0)
-        delta_targets = tf.pad(delta_targets, [(0, N + P), (0, 0)])
+        labels = tf.pad(labels, [(0, P)], constant_values=-1) # [num_rois]
+        delta_targets = tf.pad(delta_targets, [(0, N + P), (0, 0)]) # [num_rois, 4]
         
         
         # Compute weights
+        label_weights = tf.zeros((self.num_rcnn_deltas,), dtype=tf.float32)
+        delta_weights = tf.zeros((self.num_rcnn_deltas,), dtype=tf.float32)
         if num_bfg > 0:
-            label_weights = tf.concat([tf.ones((num_bfg,), dtype=tf.float32) / num_bfg, 
-                                       tf.zeros((P,), dtype=tf.float32)], 
-                                      axis=0)
-            delta_weights = tf.concat([tf.ones((num_bfg - N,), dtype=tf.float32) / num_bfg, 
-                                       tf.zeros((N + P,), dtype=tf.float32)], 
-                                      axis=0)
-        else:
-            label_weights = tf.zeros((labels.shape[0],), dtype=tf.float32)
-            delta_weights = tf.zeros((delta_targets.shape[0],), dtype=tf.float32)
+            label_weights = tf.where(labels >= 0,
+                                     tf.ones((self.num_rcnn_deltas,), dtype=tf.float32) / num_bfg,
+                                     label_weights)
 
-        delta_weights = tf.tile(tf.reshape(delta_weights, (-1, 1)), [1, 4])
+            delta_weights = tf.where(labels > 0,
+                                     tf.ones((self.num_rcnn_deltas,), dtype=tf.float32) / num_bfg,
+                                     label_weights)
+            
+        delta_weights = tf.tile(tf.reshape(delta_weights, (-1, 1)), [1, 4]) # [num_rois, 4]
         
-        new_delta_targets = tf.zeros((labels.shape[0], self.num_classes, 4))
-        new_delta_weights = tf.zeros((labels.shape[0], self.num_classes, 4))
-
+        # Organize Box targets and weights
+        tile_delta_targets = tf.zeros((self.num_rcnn_deltas, self.num_classes, 4))
+        tile_delta_weights = tf.zeros((self.num_rcnn_deltas, self.num_classes, 4))
         ids = tf.stack([tf.range(self.num_rcnn_deltas, dtype=tf.int64), labels], axis=1)
-        delta_targets = tf.tensor_scatter_nd_update(new_delta_targets,
-                                                    ids,
-                                                    delta_targets)
-        
-        delta_weights = tf.tensor_scatter_nd_update(new_delta_weights,
-                                                    ids,
-                                                    delta_weights)
+        delta_targets = tf.tensor_scatter_nd_update(tile_delta_targets, ids, delta_targets) # [num_rois, self.num_classes, 4]
+        delta_weights = tf.tensor_scatter_nd_update(tile_delta_weights, ids, delta_weights) # [num_rois, self.num_classes, 4]
         
         return rois, labels, label_weights, delta_targets, delta_weights

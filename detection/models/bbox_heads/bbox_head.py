@@ -25,7 +25,6 @@ class BBoxHead(tf.keras.Model):
         self.max_instances = max_instances
         
         self.rcnn_class_loss = losses.RCNNClassLoss()
-#         self.rcnn_class_loss = losses.rcnn_class_loss
         self.rcnn_bbox_loss = losses.RCNNBBoxLoss()
         
         self.rcnn_class_conv1 = layers.Conv2D(1024, self.pool_size, 
@@ -81,8 +80,6 @@ class BBoxHead(tf.keras.Model):
         '''
         rcnn_class_loss = self.rcnn_class_loss(
             rcnn_labels, rcnn_class_logits, rcnn_label_weights)
-#         rcnn_class_loss = self.rcnn_class_loss(
-#             rcnn_labels, rcnn_class_logits)
         rcnn_bbox_loss = self.rcnn_bbox_loss(
             rcnn_delta_targets, rcnn_deltas, rcnn_delta_weights)
         

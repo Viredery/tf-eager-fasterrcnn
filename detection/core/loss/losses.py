@@ -25,7 +25,14 @@ class RPNClassLoss(layers.Layer):
             losses.SparseCategoricalCrossentropy(from_logits=True,
                                                  reduction=losses.Reduction.NONE)
 
-    def __call__(self, rpn_labels, rpn_class_logits, rpn_label_weights):
+    def __call__(self, rpn_labels, rpn_class_logits, rpn_label_weights):       
+        # Filtering if label == -1
+        indices = tf.where(tf.not_equal(rpn_labels, -1))
+        rpn_labels = tf.gather_nd(rpn_labels, indices)
+        rpn_label_weights = tf.gather_nd(rpn_label_weights, indices)
+        rpn_class_logits = tf.gather_nd(rpn_class_logits, indices)
+        
+        # Calculate loss
         loss = self.sparse_categorical_crossentropy(y_true=rpn_labels,
                                                     y_pred=rpn_class_logits,
                                                     sample_weight=rpn_label_weights)
@@ -55,6 +62,13 @@ class RCNNClassLoss(layers.Layer):
                                                  reduction=losses.Reduction.NONE)
 
     def __call__(self, rcnn_labels, rcnn_class_logits, rcnn_label_weights):
+        # Filtering if label == -1
+        indices = tf.where(tf.not_equal(rcnn_labels, -1))
+        rcnn_labels = tf.gather_nd(rcnn_labels, indices)
+        rcnn_label_weights = tf.gather_nd(rcnn_label_weights, indices)
+        rcnn_class_logits = tf.gather_nd(rcnn_class_logits, indices)
+
+        # Calculate loss
         loss = self.sparse_categorical_crossentropy(y_true=rcnn_labels,
                                                     y_pred=rcnn_class_logits,
                                                     sample_weight=rcnn_label_weights)
