@@ -21,12 +21,10 @@ see `train_model.ipynb`, `inspect_model.ipynb` and `eval_model.ipynb`
 
 # Updating
 
-- [ ] multi-GPU training
 - [ ] online hard examples mining
 - [ ] soft-nms
 - [ ] TTA (multi-scale testing, flip and box voting)
 - [ ] multi-scale training
-
 
 # Acknowledgement
 

@@ -175,7 +175,7 @@ class ProposalTarget(object):
         # Organize Box targets and weights
         tile_delta_targets = tf.zeros((self.num_rcnn_deltas, self.num_classes, 4))
         tile_delta_weights = tf.zeros((self.num_rcnn_deltas, self.num_classes, 4))
-        ids = tf.stack([tf.range(self.num_rcnn_deltas, dtype=tf.int64), labels], axis=1)
+        ids = tf.stack([tf.range(self.num_rcnn_deltas, dtype=labels.dtype), labels], axis=1)
         delta_targets = tf.tensor_scatter_nd_update(tile_delta_targets, ids, delta_targets) # [num_rois, self.num_classes, 4]
         delta_weights = tf.tensor_scatter_nd_update(tile_delta_weights, ids, delta_weights) # [num_rois, self.num_classes, 4]
         

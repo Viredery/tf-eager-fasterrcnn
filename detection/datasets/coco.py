@@ -46,7 +46,7 @@ class CocoDataSet(object):
         self.img_ids, self.img_infos = self._filter_imgs()
         
         if debug:
-            self.img_ids, self.img_infos = self.img_ids[:5], self.img_infos[:5]
+            self.img_ids, self.img_infos = self.img_ids[:20], self.img_infos[:20]
             
         self.image_dir = "{}/{}2017".format(dataset_dir, subset)
         
