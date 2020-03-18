@@ -43,7 +43,7 @@ class FPN(tf.keras.Model):
         self.fpn_p5 = layers.Conv2D(out_channels, (3, 3), padding='SAME', 
                                     kernel_initializer='he_normal', name='fpn_p5')
         
-        self.fpn_p6 = layers.MaxPooling2D(pool_size=(1, 1), strides=2, name='fpn_p6')
+        self.fpn_p6 = layers.MaxPooling2D(pool_size=(2, 2), strides=2, name='fpn_p6')
         
             
     def __call__(self, inputs, training=True):
@@ -71,7 +71,7 @@ class FPN(tf.keras.Model):
         C2_shape, C3_shape, C4_shape, C5_shape = \
             C2_shape.as_list(), C3_shape.as_list(), C4_shape.as_list(), C5_shape.as_list()
         
-        C6_shape = [C5_shape[0], (C5_shape[1] + 1) // 2, (C5_shape[2] + 1) // 2, self.out_channels]
+        C6_shape = [C5_shape[0], C5_shape[1] // 2, C5_shape[2] // 2, self.out_channels]
         
         C2_shape[-1] = self.out_channels
         C3_shape[-1] = self.out_channels
@@ -85,12 +85,11 @@ class FPN(tf.keras.Model):
                 tf.TensorShape(C6_shape)]
 
 if __name__ == '__main__':
-    tf.enable_eager_execution()
     
-    C2 = tf.random_normal((2, 256, 256,  256))
-    C3 = tf.random_normal((2, 128, 128,  512))
-    C4 = tf.random_normal((2,  64,  64, 1024))
-    C5 = tf.random_normal((2,  32,  32, 2048))
+    C2 = tf.random.normal((2, 200, 200,  256))
+    C3 = tf.random.normal((2, 100, 100,  512))
+    C4 = tf.random.normal((2,  50,  50, 1024))
+    C5 = tf.random.normal((2,  25,  25, 2048))
     
     fpn = FPN()
     
