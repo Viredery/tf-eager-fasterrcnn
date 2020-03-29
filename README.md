@@ -17,6 +17,7 @@ see `train_model.ipynb`, `inspect_model.ipynb` and `eval_model.ipynb`
 ### Download trained Faster R-CNN
 
 - [百度网盘](https://pan.baidu.com/s/1I5PGkpvnDSduJnngoWuktQ)
+- [Google Drive](https://drive.google.com/file/d/1yCF-BqqM2x3bqWlJmAyDM-HuhDcLzt0t/view?usp=sharing)
 
 
 # Updating
