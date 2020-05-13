@@ -168,7 +168,7 @@ class ProposalTarget(object):
 
             delta_weights = tf.where(labels > 0,
                                      tf.ones((self.num_rcnn_deltas,), dtype=tf.float32) / num_bfg,
-                                     label_weights)
+                                     delta_weights)
             
         delta_weights = tf.tile(tf.reshape(delta_weights, (-1, 1)), [1, 4]) # [num_rois, 4]
         
