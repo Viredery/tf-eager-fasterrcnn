@@ -22,23 +22,19 @@ class _Bottleneck(tf.keras.Model):
         self.out_channel = filters3
         
         self.conv2a = layers.Conv2D(filters1, (1, 1), strides=(stride, stride),
-                                    kernel_initializer='he_normal',
                                     name=conv_name_base + '2a')
         self.bn2a = layers.BatchNormalization(name=bn_name_base + '2a')
 
         self.conv2b = layers.Conv2D(filters2, (3, 3), padding='same',
-                                    kernel_initializer='he_normal',
                                     name=conv_name_base + '2b')
         self.bn2b = layers.BatchNormalization(name=bn_name_base + '2b')
 
         self.conv2c = layers.Conv2D(filters3, (1, 1),
-                                    kernel_initializer='he_normal',
                                     name=conv_name_base + '2c')
         self.bn2c = layers.BatchNormalization(name=bn_name_base + '2c')
          
         if self.downsampling:
             self.conv_shortcut = layers.Conv2D(filters3, (1, 1), strides=(stride, stride),
-                                               kernel_initializer='he_normal',
                                                name=conv_name_base + '1')
             self.bn_shortcut = layers.BatchNormalization(name=bn_name_base + '1')     
     
@@ -83,10 +79,7 @@ class ResNet(tf.keras.Model):
         self.depth = depth
     
         self.padding = layers.ZeroPadding2D((3, 3))
-        self.conv1 = layers.Conv2D(64, (7, 7),
-                                   strides=(2, 2),
-                                   kernel_initializer='he_normal',
-                                   name='conv1')
+        self.conv1 = layers.Conv2D(64, (7, 7), strides=(2, 2), name='conv1')
         self.bn_conv1 = layers.BatchNormalization(name='bn_conv1')
         self.max_pool = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same')
         

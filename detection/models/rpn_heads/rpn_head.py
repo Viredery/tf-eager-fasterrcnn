@@ -70,15 +70,12 @@ class RPNHead(tf.keras.Model):
         
         # Shared convolutional base of the RPN
         self.rpn_conv_shared = layers.Conv2D(512, (3, 3), padding='same',
-                                             kernel_initializer='he_normal', 
                                              name='rpn_conv_shared')
         
         self.rpn_class_raw = layers.Conv2D(2 * len(anchor_ratios), (1, 1),
-                                           kernel_initializer='he_normal', 
                                            name='rpn_class_raw')
 
         self.rpn_delta_pred = layers.Conv2D(len(anchor_ratios) * 4, (1, 1),
-                                           kernel_initializer='he_normal', 
                                            name='rpn_bbox_pred')
         
     def __call__(self, inputs, training=True):

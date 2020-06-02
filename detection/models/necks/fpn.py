@@ -20,31 +20,21 @@ class FPN(tf.keras.Model):
         
         self.out_channels = out_channels
         
-        self.fpn_c2p2 = layers.Conv2D(out_channels, (1, 1), 
-                                      kernel_initializer='he_normal', name='fpn_c2p2')
-        self.fpn_c3p3 = layers.Conv2D(out_channels, (1, 1), 
-                                      kernel_initializer='he_normal', name='fpn_c3p3')
-        self.fpn_c4p4 = layers.Conv2D(out_channels, (1, 1), 
-                                      kernel_initializer='he_normal', name='fpn_c4p4')
-        self.fpn_c5p5 = layers.Conv2D(out_channels, (1, 1), 
-                                      kernel_initializer='he_normal', name='fpn_c5p5')
+        self.fpn_c2p2 = layers.Conv2D(out_channels, (1, 1), name='fpn_c2p2')
+        self.fpn_c3p3 = layers.Conv2D(out_channels, (1, 1), name='fpn_c3p3')
+        self.fpn_c4p4 = layers.Conv2D(out_channels, (1, 1), name='fpn_c4p4')
+        self.fpn_c5p5 = layers.Conv2D(out_channels, (1, 1), name='fpn_c5p5')
         
         self.fpn_p3upsampled = layers.UpSampling2D(size=(2, 2), name='fpn_p3upsampled')
         self.fpn_p4upsampled = layers.UpSampling2D(size=(2, 2), name='fpn_p4upsampled')
         self.fpn_p5upsampled = layers.UpSampling2D(size=(2, 2), name='fpn_p5upsampled')
         
-        
-        self.fpn_p2 = layers.Conv2D(out_channels, (3, 3), padding='SAME', 
-                                    kernel_initializer='he_normal', name='fpn_p2')
-        self.fpn_p3 = layers.Conv2D(out_channels, (3, 3), padding='SAME', 
-                                    kernel_initializer='he_normal', name='fpn_p3')
-        self.fpn_p4 = layers.Conv2D(out_channels, (3, 3), padding='SAME', 
-                                    kernel_initializer='he_normal', name='fpn_p4')
-        self.fpn_p5 = layers.Conv2D(out_channels, (3, 3), padding='SAME', 
-                                    kernel_initializer='he_normal', name='fpn_p5')
+        self.fpn_p2 = layers.Conv2D(out_channels, (3, 3), padding='SAME', name='fpn_p2')
+        self.fpn_p3 = layers.Conv2D(out_channels, (3, 3), padding='SAME', name='fpn_p3')
+        self.fpn_p4 = layers.Conv2D(out_channels, (3, 3), padding='SAME', name='fpn_p4')
+        self.fpn_p5 = layers.Conv2D(out_channels, (3, 3), padding='SAME', name='fpn_p5')
         
         self.fpn_p6 = layers.MaxPooling2D(pool_size=(2, 2), strides=2, name='fpn_p6')
-        
             
     def __call__(self, inputs, training=True):
         C2, C3, C4, C5 = inputs

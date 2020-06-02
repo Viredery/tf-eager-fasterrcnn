@@ -13,6 +13,7 @@ def trim_zeros(boxes, name=None):
     boxes = tf.boolean_mask(boxes, non_zeros, name=name)
     return boxes, non_zeros
 
+
 def parse_image_meta(meta):
     '''Parses a tensor that contains image attributes to its components.
     
@@ -38,6 +39,7 @@ def parse_image_meta(meta):
         'flip': flip
     }
 
+
 def calc_batch_padded_shape(meta):
     '''
     Args
@@ -49,6 +51,7 @@ def calc_batch_padded_shape(meta):
         nd.ndarray. Tuple of (height, width)
     '''
     return tf.cast(tf.reduce_max(meta[:, 6:8], axis=0), tf.int32).numpy()
+
 
 def calc_img_shapes(meta):
     '''
