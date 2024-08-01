@@ -154,7 +154,7 @@ class ProposalTarget(object):
         
         rois = tf.pad(rois, [(0, P), (0, 0)]) # [num_rois, 5]
         labels = tf.pad(labels, [(0, N)], constant_values=0)
-        labels = tf.pad(labels, [(0, P)], constant_values=-1) # [num_rois]
+        labels = tf.pad(labels, [(0, P)], constant_values=0) # [num_rois]
         delta_targets = tf.pad(delta_targets, [(0, N + P), (0, 0)]) # [num_rois, 4]
         
         
